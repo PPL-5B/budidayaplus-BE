@@ -14,3 +14,5 @@ class FoodSampling(models.Model):
 
     def __str__(self):
         return str(self.sampling_id)
+
+# hello ngetes sonar
