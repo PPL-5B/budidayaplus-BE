@@ -176,14 +176,11 @@ load_dotenv()
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('dbname'),
-        'USER': os.environ.get('user'),
-        'PASSWORD': os.environ.get('password'),
-        'HOST': os.environ.get('host'),
-        'PORT': os.environ.get('port', '5432'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
 
 
 
