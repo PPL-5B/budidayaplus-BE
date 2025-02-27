@@ -7,7 +7,7 @@ from cycle.models import Cycle
 from cycle.services.cycle_service import CycleService
 from pond.models import Pond
 from pond_quality.models import PondQuality
-from pond_quality.schemas import PondQualityAlert, PondQualityInput, PondQualityOutput, PondQualityHistory
+from pond_quality.schemas import PondQualityAlert, PondQualityInput, PondQualityOutput, PondQualityHistory, PondQualitySummary
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
@@ -132,4 +132,22 @@ def get_pond_quality_alerts(request, pond_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
 
-    return []
+    # Target dummy (bisa diganti dari DB nanti)
+    target_values = {
+        "ph_level": 7.5,
+        "salinity": 30.0,
+        "water_temperature": 27.0,
+    }
+
+    alerts = []
+    for key, target in target_values.items():
+        actual = getattr(pond_quality, key, None)
+        if actual is not None and actual < target:
+            alerts.append(PondQualityAlert(
+                parameter=key,
+                actual_value=actual,
+                target_value=target,
+                status="Below Target"
+            ))
+
+    return alerts
