@@ -20,6 +20,7 @@ jobs:
           cd /home/andromeda/dkn/budidayaplus
           git pull origin ci-cd
           docker-compose down
+          rm .env
           touch .env
           echo DEBUG=1 >> .env
           echo DB_HOST=${{ secrets.DB_HOST }} >> .env
