@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja_jwt.authentication import JWTAuth
@@ -6,7 +7,7 @@ from cycle.models import Cycle
 from cycle.services.cycle_service import CycleService
 from pond.models import Pond
 from pond_quality.models import PondQuality
-from pond_quality.schemas import PondQualityInput, PondQualityOutput, PondQualityHistory
+from pond_quality.schemas import PondQualityAlert, PondQualityInput, PondQualityOutput, PondQualityHistory
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
@@ -103,10 +104,32 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
 
 @router.get("/{pond_id}/summary", auth=JWTAuth(), response={200: PondQualitySummary})
 def get_pond_quality_summary(request, pond_id: str):
-    return {}
+    cycle = CycleService.get_active_cycle(request.auth)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+
+    check_cycle_active(cycle)
+
+    try:
+        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).latest("recorded_at")
+    except ObjectDoesNotExist:
+        raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
+
+    return {
+        "ph_level": pond_quality.ph_level,
+        "salinity": pond_quality.salinity,
+        "water_temperature": pond_quality.water_temperature
+    }
 
 @router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
 def get_pond_quality_alerts(request, pond_id: str):
-    """Implementasi minimal agar tes tidak error (tapi tetap gagal)."""
-    return []
+    cycle = CycleService.get_active_cycle(request.auth)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
 
+    check_cycle_active(cycle)
+
+    try:
+        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).latest("recorded_at")
+    except ObjectDoesNotExist:
+        raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
+
+    return []
