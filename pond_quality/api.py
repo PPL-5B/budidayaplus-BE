@@ -110,15 +110,14 @@ def get_pond_quality_summary(request, pond_id: str):
     check_cycle_active(cycle)
 
     try:
-        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).latest("recorded_at")
+        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
+            "recorded_at", "ph_level", "salinity", "water_temperature"
+        ).latest("recorded_at")
     except ObjectDoesNotExist:
         raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
 
-    return {
-        "ph_level": pond_quality.ph_level,
-        "salinity": pond_quality.salinity,
-        "water_temperature": pond_quality.water_temperature
-    }
+    return PondQualitySummary(**pond_quality)
+
 
 @router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
 def get_pond_quality_alerts(request, pond_id: str):
@@ -128,20 +127,19 @@ def get_pond_quality_alerts(request, pond_id: str):
     check_cycle_active(cycle)
 
     try:
-        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).latest("recorded_at")
+        # Ambil hanya parameter yang diperlukan dari PondQuality
+        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
+            "ph_level", "salinity", "water_temperature", "recorded_at"
+        ).latest("recorded_at")
     except ObjectDoesNotExist:
-        raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
+        return []  # Jika tidak ada data, kembalikan list kosong
 
-    # Target dummy (bisa diganti dari DB nanti)
-    target_values = {
-        "ph_level": 7.5,
-        "salinity": 30.0,
-        "water_temperature": 27.0,
-    }
+    # Ambil target dari database atau hardcoded (sementara)
+    target_values = get_target_values_from_db(cycle)
 
     alerts = []
     for key, target in target_values.items():
-        actual = getattr(pond_quality, key, None)
+        actual = pond_quality.get(key, None)  # Ambil nilai parameter dari query
         if actual is not None and actual < target:
             alerts.append(PondQualityAlert(
                 parameter=key,
@@ -151,3 +149,14 @@ def get_pond_quality_alerts(request, pond_id: str):
             ))
 
     return alerts
+
+def get_target_values_from_db(cycle):
+    """
+    Ambil target dari database berdasarkan `cycle`.
+    Untuk sementara, pakai hardcoded
+    """
+    return {
+        "ph_level": 7.5,
+        "salinity": 30.0,
+        "water_temperature": 27.0,
+    }
