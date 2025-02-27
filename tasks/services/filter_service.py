@@ -11,5 +11,5 @@ class FilterService(ABC):
 
     @staticmethod
     @abstractmethod
-    def filter_tasks_by_date(cycle_id: str, date: date | None = None) -> QuerySet:
+    def filter_tasks_by_date(cycle_id: str, date: date = None) -> QuerySet:
         """Filter tasks for a specific date. Defaults to today's date if not provided."""
