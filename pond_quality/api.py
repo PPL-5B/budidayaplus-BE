@@ -99,3 +99,14 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
         raise HttpError(401, UNAUTHORIZED_ACCESS)
 
     return pond_quality
+
+
+@router.get("/{pond_id}/summary", auth=JWTAuth(), response={200: PondQualitySummary})
+def get_pond_quality_summary(request, pond_id: str):
+    return {}
+
+@router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
+def get_pond_quality_alerts(request, pond_id: str):
+    """Implementasi minimal agar tes tidak error (tapi tetap gagal)."""
+    return []
+
