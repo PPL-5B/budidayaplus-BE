@@ -3,10 +3,10 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from ninja.testing import TestClient
 from fish_sampling.models import Pond, FishSampling, Cycle
-from fish_sampling.api import router
+from fish_sampling.api import router, determine_status
 import json
 from rest_framework_simplejwt.tokens import AccessToken
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from django.utils.timezone import make_aware
 from user_profile.models import UserProfile, Worker
 
@@ -147,3 +147,63 @@ class FishSamplingAPITest(TestCase):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
+
+class DetermineStatusTests(TestCase):
+    def test_determine_status_normal(self):
+        status = determine_status(15, 0.6)  
+        self.assertEqual(status, "normal")
+
+    def test_determine_status_abnormal(self):
+        status = determine_status(5, 0.1)  
+        self.assertEqual(status, "abnormal")
+
+    def test_determine_status_unknown(self):
+        status = determine_status(0, 0)  
+        self.assertEqual(status, "unknown")
+
+    def test_determine_status_target_values_zero(self):
+        status = determine_status(0, 1.0)  
+        self.assertEqual(status, "unknown")
+
+        status = determine_status(10, 0)  
+        self.assertEqual(status, "unknown")
+
+    def test_force_return_unknown(self):
+        status = determine_status(0, 0)
+        self.assertEqual(status, "unknown")
+
+
+
+def test_get_latest_fish_size_success(self):
+    response = self.client.get(
+        f'/{self.pond.pond_id}/{self.cycle.id}/fish-size/',
+        headers=self.headers
+    )
+
+    self.assertEqual(response.status_code, 200)
+    self.assertEqual(response.json()['fish_length'], self.fish_sampling.fish_length)
+    self.assertEqual(response.json()['fish_weight'], self.fish_sampling.fish_weight)
+    self.assertIn(response.json()['status'], ['normal', 'abnormal'])
+
+
+def test_get_latest_fish_size_no_data(self):
+    FishSampling.objects.all().delete()  # Clear fish sampling data
+    response = self.client.get(
+        f'/{self.pond.pond_id}/{self.cycle.id}/fish-size/',
+        headers=self.headers
+    )
+    self.assertEqual(response.status_code, 404)
+    self.assertEqual(response.json()['detail'], 'Data belum tersedia, silakan isi data terlebih dahulu')
+
+def test_get_latest_fish_size_inactive_cycle(self):
+    old_cycle = Cycle.objects.create(
+        supervisor=self.supervisor,
+        start_date=datetime.now() - timedelta(days=90),
+        end_date=datetime.now() - timedelta(days=60),
+    )
+    response = self.client.get(
+        f'/{self.pond.pond_id}/{old_cycle.id}/fish-size/',
+        headers=self.headers
+    )
+    self.assertEqual(response.status_code, 400)
+    self.assertEqual(response.json()['detail'], 'Siklus tidak aktif')

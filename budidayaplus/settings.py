@@ -177,10 +177,10 @@ load_dotenv()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'budidayaplus_db',
+        'NAME': 'postgres',
         'USER': 'postgres',
-        'PASSWORD': 'P1sangkep0k',
-        'HOST': 'localhost',
+        'PASSWORD': 'budidayaplus-db',
+        'HOST': 'db.kbfntbrovfyarjjdyygu.supabase.co',
         'PORT': '5432',
     }
 }
