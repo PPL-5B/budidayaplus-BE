@@ -78,7 +78,7 @@ def filter_tasks_by_date(request, date: date = Query(None)):
         raise HttpError(400, "Data tidak ditemukan")
 
 @router.get("/{task_id}", response={200: TaskSchema})
-def get_task_by_id(request, task_id: str):
+def get_task_by_id(request, task_id: str): #GET THE LATEST TASKS
     try:
         task = TaskRetrieveServiceImpl.retrieve_task(task_id)
         return task
