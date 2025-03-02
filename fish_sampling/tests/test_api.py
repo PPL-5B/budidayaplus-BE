@@ -172,8 +172,6 @@ class DetermineStatusTests(TestCase):
         status = determine_status(0, 0)
         self.assertEqual(status, "unknown")
 
-
-
 def test_get_latest_fish_size_success(self):
     response = self.client.get(
         f'/{self.pond.pond_id}/{self.cycle.id}/fish-size/',

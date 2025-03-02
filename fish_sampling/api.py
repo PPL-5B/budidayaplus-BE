@@ -57,7 +57,6 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
         )
         return fish_sampling
 
-
 @router.get("/{pond_id}/{cycle_id}/latest/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
@@ -70,7 +69,6 @@ def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
     return fish_sampling
-
 
 @router.get("/{pond_id}/", auth=JWTAuth(), response={200: FishSamplingList})
 def list_fish_samplings(request, pond_id: str):
@@ -106,7 +104,6 @@ def determine_status(fish_length, fish_weight):
         return "unknown"
 
     return "normal" if fish_length >= target_length and fish_weight >= target_weight else "abnormal"
-
 
 @router.get("/{pond_id}/{cycle_id}/fish-size/", auth=JWTAuth())
 def get_latest_fish_size(request, pond_id: str, cycle_id: str):
