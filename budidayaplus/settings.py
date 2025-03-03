@@ -177,11 +177,11 @@ load_dotenv()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get("DB_NAME"),
-        'USER': os.environ.get("DB_USER"),
-        'PASSWORD': os.environ.get("DB_PASS"),
-        'HOST': os.environ.get("DB_HOST"),
-        'PORT': os.environ.get("DB_PORT"),
+        'NAME': 'budidayaplus_db',
+        'USER': 'postgres',
+        'PASSWORD': 'P1sangkep0k',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
