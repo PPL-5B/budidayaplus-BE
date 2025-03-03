@@ -68,6 +68,9 @@ class FishSamplingAPITest(TestCase):
         self.assertEqual(response.json()["fish_length"], 30.0)
         self.assertTrue(response.json()["recorded_at"]) 
 
+        # Tidak ada warning
+        self.assertNotIn("warning", response.json())  
+
     def test_add_fish_sampling_with_warning(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/',
@@ -77,6 +80,9 @@ class FishSamplingAPITest(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertIn("warning", response.json())
+        self.assertEqual(response.json()["warning"], "Berat dan panjang ikan terlalu besar, harap pastikan data benar.")
+
 
     def test_create_fish_sampling_with_warning_weight(self):
         response = self.client.post(
@@ -87,6 +93,9 @@ class FishSamplingAPITest(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertIn("warning", response.json())
+        self.assertEqual(response.json()["warning"], "Berat ikan lebih dari 10 kg, harap pastikan data benar.")
+
 
     def test_create_fish_sampling_with_warning_length(self):
         response = self.client.post(
@@ -96,6 +105,8 @@ class FishSamplingAPITest(TestCase):
             headers=self.headers
         )
         self.assertEqual(response.status_code, 200)
+        self.assertIn("warning", response.json())
+        self.assertEqual(response.json()["warning"], "Panjang ikan lebih dari 100 cm, harap pastikan data benar.")
     
     def test_add_fish_sampling_with_invalid_data(self):
         response = self.client.post(f'/{self.pond.pond_id}/{self.cycle.id}/', data=json.dumps({
