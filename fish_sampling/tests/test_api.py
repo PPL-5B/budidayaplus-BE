@@ -3,12 +3,13 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from ninja.testing import TestClient
 from fish_sampling.models import Pond, FishSampling, Cycle
-from fish_sampling.api import router, determine_status
+from fish_sampling.api import router
 import json
 from rest_framework_simplejwt.tokens import AccessToken
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
 from user_profile.models import UserProfile, Worker
+from fish_sampling.api import determine_fish_status
 
 class FishSamplingAPITest(TestCase):
     def setUp(self):
@@ -148,60 +149,106 @@ class FishSamplingAPITest(TestCase):
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
 
-class DetermineStatusTests(TestCase):
-    def test_determine_status_normal(self):
-        status = determine_status(15, 0.6)  
-        self.assertEqual(status, "normal")
+    # def test_get_fish_status_normal(self):
+    #         response = self.client.post(
+    #             f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+    #             data=json.dumps({
+    #                 'week': 1,
+    #                 'fish_length': 5.5,
+    #                 'fish_weight': 0.002
+    #             }),
+    #             content_type="application/json",
+    #             headers=self.headers
+    #         )
+    #         self.assertEqual(response.status_code, 200)
+    #         self.assertEqual(response.json()['status'], 'normal')
 
-    def test_determine_status_abnormal(self):
-        status = determine_status(5, 0.1)  
-        self.assertEqual(status, "abnormal")
+    # def test_get_fish_status_abnormal_due_to_length(self):
+    #     response = self.client.post(
+    #         f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+    #         data=json.dumps({
+    #             'week': 1,
+    #             'fish_length': 0.001,
+    #             'fish_weight': 0.002
+    #         }),
+    #         content_type="application/json",
+    #         headers=self.headers
+    #     )
+    #     self.assertEqual(response.status_code, 200)
+    #     self.assertEqual(response.json()['status'], 'abnormal')
 
-    def test_determine_status_unknown(self):
-        status = determine_status(0, 0)  
-        self.assertEqual(status, "unknown")
+    # def test_get_fish_status_abnormal_due_to_weight(self):
+    #     response = self.client.post(
+    #         f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+    #         data=json.dumps({
+    #             'week': 1,
+    #             'fish_length': 5.5,
+    #             'fish_weight': 0.3
+    #         }),
+    #         content_type="application/json",
+    #         headers=self.headers
+    #     )
+    #     self.assertEqual(response.status_code, 200)
+    #     self.assertEqual(response.json()['status'], 'abnormal')
 
-    def test_determine_status_target_values_zero(self):
-        status = determine_status(0, 1.0)  
-        self.assertEqual(status, "unknown")
+    def test_get_fish_status_missing_data(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            data=json.dumps({
+                'week': 5
+            }),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('fish_length', response.json()['detail'])
+        self.assertIn('fish_weight', response.json()['detail'])
 
-        status = determine_status(10, 0)  
-        self.assertEqual(status, "unknown")
+    def test_get_fish_status_negative_values(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            data=json.dumps({
+                'week': 5,
+                'fish_length': -5.0,
+                'fish_weight': -0.010
+            }),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['detail'], 'Panjang dan berat ikan harus lebih dari 0')
 
-    def test_force_return_unknown(self):
-        status = determine_status(0, 0)
-        self.assertEqual(status, "unknown")
-
-def test_get_latest_fish_size_success(self):
-    response = self.client.get(
-        f'/{self.pond.pond_id}/{self.cycle.id}/fish-size/',
-        headers=self.headers
-    )
-
-    self.assertEqual(response.status_code, 200)
-    self.assertEqual(response.json()['fish_length'], self.fish_sampling.fish_length)
-    self.assertEqual(response.json()['fish_weight'], self.fish_sampling.fish_weight)
-    self.assertIn(response.json()['status'], ['normal', 'abnormal'])
+    def test_get_fish_status_no_input_yet(self):
+        """Menghapus semua FishSampling sebelum request untuk memastikan ObjectDoesNotExist tercapai"""
+        FishSampling.objects.all().delete()
+        response = self.client.get(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], "Data belum tersedia, silakan isi data terlebih dahulu")
 
 
-def test_get_latest_fish_size_no_data(self):
-    FishSampling.objects.all().delete()  # Clear fish sampling data
-    response = self.client.get(
-        f'/{self.pond.pond_id}/{self.cycle.id}/fish-size/',
-        headers=self.headers
-    )
-    self.assertEqual(response.status_code, 404)
-    self.assertEqual(response.json()['detail'], 'Data belum tersedia, silakan isi data terlebih dahulu')
 
-def test_get_latest_fish_size_inactive_cycle(self):
-    old_cycle = Cycle.objects.create(
-        supervisor=self.supervisor,
-        start_date=datetime.now() - timedelta(days=90),
-        end_date=datetime.now() - timedelta(days=60),
-    )
-    response = self.client.get(
-        f'/{self.pond.pond_id}/{old_cycle.id}/fish-size/',
-        headers=self.headers
-    )
-    self.assertEqual(response.status_code, 400)
-    self.assertEqual(response.json()['detail'], 'Siklus tidak aktif')
+class DetermineFishStatusTest(TestCase):
+    def test_determine_fish_status_normal(self):
+        """Pastikan ikan dikategorikan normal jika berada dalam margin 20% dari target"""
+        self.assertEqual(determine_fish_status(1, 5.5, 0.002), "normal")  # Sesuai target
+        self.assertEqual(determine_fish_status(1, 6.0, 0.0021), "normal")  # Sedikit di atas
+        self.assertEqual(determine_fish_status(1, 5.0, 0.0019), "normal")  # Sedikit di bawah
+
+    def test_determine_fish_status_abnormal_due_to_length(self):
+        """Pastikan ikan dikategorikan abnormal jika panjang melebihi 20% target"""
+        self.assertEqual(determine_fish_status(1, 7.0, 0.002), "abnormal")  # 27% lebih panjang
+        self.assertEqual(determine_fish_status(1, 4.0, 0.002), "abnormal")  # 27% lebih pendek
+
+    def test_determine_fish_status_abnormal_due_to_weight(self):
+        """Pastikan ikan dikategorikan abnormal jika berat melebihi 20% target"""
+        self.assertEqual(determine_fish_status(1, 5.5, 0.003), "abnormal")  # Berat lebih dari 20% target
+        self.assertEqual(determine_fish_status(1, 5.5, 0.001), "abnormal")  # Berat kurang dari 20% target
+
+    def test_determine_fish_status_invalid_week(self):
+        """Pastikan jika week di luar 1-9, return invalid_week"""
+        self.assertEqual(determine_fish_status(0, 5.5, 0.002), "invalid_week")
+        self.assertEqual(determine_fish_status(10, 5.5, 0.002), "invalid_week")
+        
