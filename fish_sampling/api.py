@@ -18,8 +18,22 @@ from django.core.exceptions import ObjectDoesNotExist
 DATA_NOT_FOUND = "Data tidak ditemukan"
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
 UNAUTHORIZED_ACCESS = "Anda tidak memiliki akses untuk melihat data ini"
+INVALID_WEEK = "Minggu harus antara 1 sampai 9"
+INVALID_INPUT = "Panjang dan berat ikan harus lebih dari 0"
 
 router = Router()
+
+target_data = {
+    1: {'fish_length': 5.5, 'fish_weight': 0.002},
+    2: {'fish_length': 8.0, 'fish_weight': 0.005},
+    3: {'fish_length': 10.5, 'fish_weight': 0.012},
+    4: {'fish_length': 13.0, 'fish_weight': 0.022},
+    5: {'fish_length': 16.5, 'fish_weight': 0.035},
+    6: {'fish_length': 19.0, 'fish_weight': 0.050},
+    7: {'fish_length': 22.5, 'fish_weight': 0.070},
+    8: {'fish_length': 25.0, 'fish_weight': 0.090},
+    9: {'fish_length': 27.5, 'fish_weight': 0.110},
+}
 
 def check_today_fish_sampling(pond, cycle):
     today = datetime.now().date()
@@ -57,6 +71,7 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
         )
         return fish_sampling
 
+
 @router.get("/{pond_id}/{cycle_id}/latest/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
@@ -70,6 +85,7 @@ def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
         raise HttpError(404, DATA_NOT_FOUND)
     return fish_sampling
 
+
 @router.get("/{pond_id}/", auth=JWTAuth(), response={200: FishSamplingList})
 def list_fish_samplings(request, pond_id: str):
     cycle = CycleService.get_active_cycle(request.auth)
@@ -80,48 +96,29 @@ def list_fish_samplings(request, pond_id: str):
     fish_samplings = FishSampling.objects.filter(cycle=cycle, pond=pond).order_by('-recorded_at')
     return {"fish_samplings": fish_samplings, "cycle_id": cycle.id}
 
-def determine_status(fish_length, fish_weight):
-    if fish_length <= 0 or fish_weight <= 0:
-        return "unknown"  # Explicitly handle zero or negative values
+def determine_fish_status(week: int, fish_length: float, fish_weight: float) -> str:
+    target = target_data.get(week)
+    if not target:
+        return "invalid_week"
+    
+    length_threshold = target['fish_length'] * 0.2  # 20% margin
+    weight_threshold = target['fish_weight'] * 0.2  # 20% margin
+    
+    if abs(fish_length - target['fish_length']) > length_threshold or abs(fish_weight - target['fish_weight']) > weight_threshold:
+        return "abnormal"
+    return "normal"
 
-    culture_template = {
-        1: {'length': 10, 'weight': 0.3},
-        2: {'length': 15, 'weight': 0.6},
-        3: {'length': 20, 'weight': 1.0},
-        4: {'length': 25, 'weight': 1.5},
-        5: {'length': 30, 'weight': 2.2},
-        6: {'length': 35, 'weight': 3.0},
-        7: {'length': 40, 'weight': 4.0},
-        8: {'length': 45, 'weight': 5.2},
-        9: {'length': 50, 'weight': 6.5},
-    }
-
-    target_data = culture_template.get(1)  # Assuming week 1 as default
-    target_length = target_data.get("length", 0)
-    target_weight = target_data.get("weight", 0)
-
-    if target_length == 0 or target_weight == 0:
-        return "unknown"
-
-    return "normal" if fish_length >= target_length and fish_weight >= target_weight else "abnormal"
-
-@router.get("/{pond_id}/{cycle_id}/fish-size/", auth=JWTAuth())
-def get_latest_fish_size(request, pond_id: str, cycle_id: str):
-    pond = get_object_or_404(Pond, pond_id=pond_id)
+@router.get("/{pond_id}/{cycle_id}/status/", auth=JWTAuth())
+def get_latest_fish_status(request, pond_id: str, cycle_id: str):
     cycle = get_object_or_404(Cycle, id=cycle_id)
-
-    # Ensure cycle is active before proceeding
+    pond = get_object_or_404(Pond, pond_id=pond_id)
     check_cycle_active(cycle)
-
+    
     try:
         fish_sampling = FishSampling.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
-    except FishSampling.DoesNotExist:
-        raise HttpError(404, 'Data belum tersedia, silakan isi data terlebih dahulu')
-
-    status = determine_status(fish_sampling.fish_length, fish_sampling.fish_weight)
-
-    return {
-        'status': status,
-        'fish_length': fish_sampling.fish_length,
-        'fish_weight': fish_sampling.fish_weight
-    }
+    except ObjectDoesNotExist:
+        raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu")
+    
+    week = (make_aware(datetime.now()) - cycle.start_date).days // 7 + 1
+    status = determine_fish_status(week, fish_sampling.fish_length, fish_sampling.fish_weight)
+    return {"status": status}
