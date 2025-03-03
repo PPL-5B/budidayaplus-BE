@@ -13,8 +13,9 @@ class FoodSamplingOutputSchema(Schema):
     pond_id: UUID4
     cycle_id: UUID4
     reporter: UserSchema
-    food_quantity: int
+    food_quantity: float
     recorded_at: datetime
+    target_food_quantity: float
 
 class FoodSamplingList(Schema):
     food_samplings: List[FoodSamplingOutputSchema]
