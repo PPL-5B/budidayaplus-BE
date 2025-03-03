@@ -316,3 +316,54 @@ class PondQualityAPITest(TestCase):
         )
         response = self.client.get(f'/{cycle.id}/{self.pond.pond_id}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
         self.assertEqual(response.status_code, 400)
+
+    def test_get_dashboard_table_data_positive(self):
+        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/dashboard-table', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertIn('recorded_at', data)
+        self.assertIn('ph_level', data)
+        self.assertIn('salinity', data)
+        self.assertIn('water_temperature', data)
+        self.assertIn('water_clarity', data)
+        
+        self.assertEqual(data['ph_level'], 7.0)
+        self.assertEqual(data['salinity'], 0.0)
+        self.assertEqual(data['water_temperature'], 25.0)
+        self.assertEqual(data['water_clarity'], 0.0)
+        
+        self.assertNotIn('water_circulation', data)
+        self.assertNotIn('dissolved_oxygen', data)
+        self.assertNotIn('orp', data)
+        self.assertNotIn('ammonia', data)
+        self.assertNotIn('nitrate', data)
+        self.assertNotIn('phosphate', data)
+
+    def test_get_dashboard_table_data_invalid_pond(self):
+        response = self.client.get(f'/{self.cycle.id}/{uuid.uuid4()}/dashboard-table', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_dashboard_table_data_invalid_token(self):
+        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/dashboard-table', headers={"Authorization": "Bearer Invalid Token"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_dashboard_table_data_invalid_user(self):
+        user = User.objects.create_user(username='081234567891', password='password')
+        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/dashboard-table', headers={"Authorization": f"Bearer {str(AccessToken.for_user(user))}"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_dashboard_table_data_not_found(self):
+        response = self.client.get(f'/{self.cycle.id}/{self.pond2.pond_id}/dashboard-table', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_dashboard_table_data_cycle_not_active(self):
+        starting_date = datetime.now() - timedelta(days=90)
+        ending_date = starting_date + timedelta(days=60)
+        cycle = Cycle.objects.create(
+            supervisor=self.user,
+            start_date=starting_date,
+            end_date=ending_date
+        )
+        response = self.client.get(f'/{cycle.id}/{self.pond.pond_id}/dashboard-table', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 400)
