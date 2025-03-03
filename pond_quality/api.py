@@ -104,7 +104,6 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
 def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
     pond = get_object_or_404(Pond, pond_id=pond_id)
-    supervisor = get_supervisor(user=request.auth)
 
     check_cycle_active(cycle)
 
@@ -113,9 +112,6 @@ def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
 
-    if (pond.owner != supervisor):
-        raise HttpError(401, UNAUTHORIZED_ACCESS)
-
     return {
         "recorded_at": pond_quality.recorded_at,
         "ph_level": pond_quality.ph_level,
@@ -123,3 +119,9 @@ def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
         "water_temperature": pond_quality.water_temperature,
         "water_clarity": pond_quality.water_clarity
     }
+
+
+def authorize_user(self, user, pond: Pond):
+    supervisor = get_supervisor(user)
+    if pond.owner != supervisor:
+        raise HttpError(401, self.UNAUTHORIZED_ACCESS)
