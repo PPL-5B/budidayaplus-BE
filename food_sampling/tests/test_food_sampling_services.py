@@ -110,24 +110,60 @@ class FoodSamplingServiceTest(TestCase):
 
         self.assertEqual(context.exception.status_code, 404)
 
-    def test_list_food_samplings(self):
+    @patch('user_profile.utils.get_supervisor')
+    @patch('cycle.repositories.cycle_repo.CycleRepo.get_active_cycle') 
+    def test_list_food_samplings(self, mock_get_active_cycle, mock_get_supervisor):
+        # Setup mock return values
         self.mock_repository.list_food_samplings.return_value = [self.mock_food_sampling]
         self.mock_cycle.supervisor = self.mock_user
-
-        result = self.service.list_food_samplings('cycle_id', 'pond_id', self.mock_user)
         
-        self.mock_repository.get_cycle.assert_called_once_with('cycle_id')
-        self.mock_repository.get_pond.assert_called_once_with('pond_id')
-        self.mock_repository.list_food_samplings.assert_called_once_with(self.mock_cycle, self.mock_pond)
-        self.assertEqual(result, [self.mock_food_sampling])
+        # Mock CycleRepo.get_active_cycle instead of repository.get_active_cycle
+        # Create the patch for the static method
+        with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
+            mock_get_active_cycle.return_value = self.mock_cycle
+            
+            # Mock get_supervisor function
+            with patch('food_sampling.services.food_sampling_service.get_supervisor') as mock_get_supervisor:
+                mock_get_supervisor.return_value = self.mock_user
+                
+                # Mock the authorize_user method to return False (assuming it should allow access)
+                self.service.authorize_user = MagicMock(return_value=False)
+                
+                # Call the method with correct parameters
+                result = self.service.list_food_samplings('pond_id', self.mock_user)
+                
+                # Verify the static method was called correctly
+                mock_get_active_cycle.assert_called_once_with(self.mock_user)
+                
+                # Verify other repository methods were called correctly
+                self.mock_repository.get_pond.assert_called_once_with('pond_id')
+                self.mock_repository.list_food_samplings.assert_called_once_with(self.mock_cycle, self.mock_pond)
+                
+                # Verify the result matches expected output
+                expected_result = {
+                    'food_samplings': [self.mock_food_sampling],
+                    'cycle_id': self.mock_cycle.id
+                }
+                self.assertEqual(result, expected_result)
 
     def test_list_food_samplings_unauthorized_access(self):
         self.mock_cycle.start_date = datetime.now().date() - timedelta(days=30)
         self.mock_cycle.end_date = datetime.now().date() + timedelta(days=30)
-
-        self.mock_cycle.supervisor = MagicMock()  
-
-        with self.assertRaises(HttpError) as context:
-            self.service.list_food_samplings('cycle_id', 'pond_id', self.mock_user)
-
-        self.assertEqual(context.exception.status_code, 401)
+        self.mock_cycle.supervisor = MagicMock()
+        
+        # Mock CycleRepo.get_active_cycle
+        with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
+            mock_get_active_cycle.return_value = self.mock_cycle
+            
+            # Mock get_supervisor function
+            with patch('food_sampling.services.food_sampling_service.get_supervisor') as mock_get_supervisor:
+                mock_get_supervisor.return_value = self.mock_user
+                
+                # Mock the authorize_user method to return True (to trigger unauthorized access)
+                self.service.authorize_user = MagicMock(return_value=True)
+                
+                # Now test for the exception
+                with self.assertRaises(HttpError) as context:
+                    self.service.list_food_samplings('pond_id', self.mock_user)
+                    
+                self.assertEqual(context.exception.status_code, 401)
