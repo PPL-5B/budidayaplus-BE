@@ -38,7 +38,6 @@ def list_pond_quality(request, pond_id: str):
         "cycle_id": cycle.id
     }
 
-
 @router.post("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityInput):
     supervisor = get_supervisor(user=request.auth)
@@ -85,9 +84,13 @@ def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str)
 
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
-    cycle = Cycle.objects.get(id=cycle_id)
+    cycle = get_object_or_404(Cycle, id=cycle_id)
     pond = get_object_or_404(Pond, pond_id=pond_id)
     supervisor = get_supervisor(user=request.auth)
+
+    # 🔹 Pindahkan validasi user sebelum mencoba mengambil data
+    if pond.owner != supervisor:
+        raise HttpError(401, UNAUTHORIZED_ACCESS)
 
     check_cycle_active(cycle)
 
@@ -95,9 +98,6 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
         pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).select_related('reporter').latest('recorded_at')
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
-
-    if (pond.owner != supervisor):
-        raise HttpError(401, UNAUTHORIZED_ACCESS)
 
     return pond_quality
 
@@ -151,10 +151,7 @@ def get_pond_quality_alerts(request, pond_id: str):
     return alerts
 
 def get_target_values_from_db(cycle):
-    """
-    Ambil target dari database berdasarkan `cycle`.
-    Untuk sementara, pakai hardcoded
-    """
+#Hardcoded Sementara
     return {
         "ph_level": 7.5,
         "salinity": 30.0,
