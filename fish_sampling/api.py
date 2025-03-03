@@ -45,17 +45,37 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
 
     if payload.fish_weight <= 0 or payload.fish_length <= 0:
         raise HttpError(400, "Berat dan panjang ikan harus lebih dari 0")
-    elif pond.owner != supervisor:
-        raise HttpError(404, "Data tidak ditemukan")
-    else:
-        fish_sampling = FishSampling.objects.create(
-            pond=pond,
-            reporter=reporter,
-            cycle=cycle,
-            recorded_at=make_aware(datetime.now()),
-            **payload.dict()
-        )
-        return fish_sampling
+    
+    # Notifikasi
+    warning_message = None
+    if payload.fish_weight > 10:
+        warning_message = "Berat ikan lebih dari 10 kg, harap pastikan data benar."
+    if payload.fish_length > 100:
+        warning_message = "Panjang ikan lebih dari 100 cm, harap pastikan data benar."
+    if payload.fish_weight > 10 and payload.fish_length > 100:
+        warning_message = "Berat dan panjang ikan terlalu besar, harap pastikan data benar."
+
+    fish_sampling = FishSampling.objects.create(
+        pond=pond,
+        reporter=reporter,
+        cycle=cycle,
+        recorded_at=make_aware(datetime.now()),
+        **payload.dict()
+    )
+
+    response_data = {
+        "pond_id": str(fish_sampling.pond.pond_id),
+        "reporter": {"id": fish_sampling.reporter.id},
+        "fish_weight": fish_sampling.fish_weight,
+        "fish_length": fish_sampling.fish_length,
+        "recorded_at": fish_sampling.recorded_at.isoformat(),
+    }
+
+    if warning_message:
+        response_data["warning"] = warning_message # Kirim response ke FE 
+
+    return Response(response_data, status=200) # Kirim response ke FE
+
     
 @router.get("/{pond_id}/{cycle_id}/latest/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
