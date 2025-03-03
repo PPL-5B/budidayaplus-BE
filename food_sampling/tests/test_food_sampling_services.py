@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from food_sampling.services.food_sampling_service import FoodSamplingService
 from food_sampling.schemas import FoodSamplingCreateSchema
 from ninja.errors import HttpError
-
+from pond_quality.api import CYCLE_NOT_ACTIVE
 
 class FoodSamplingServiceTest(TestCase):
     
@@ -167,3 +167,17 @@ class FoodSamplingServiceTest(TestCase):
                     self.service.list_food_samplings('pond_id', self.mock_user)
                     
                 self.assertEqual(context.exception.status_code, 401)
+    
+    def test_list_food_samplings_no_active_cycle(self):
+        with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
+            mock_get_active_cycle.return_value = None
+            
+            with patch('food_sampling.services.food_sampling_service.get_supervisor') as mock_get_supervisor:
+                mock_get_supervisor.return_value = self.mock_user
+                self.service.authorize_user = MagicMock(return_value=False)
+
+                with self.assertRaises(HttpError) as context:
+                    self.service.list_food_samplings('pond_id', self.mock_user)
+                
+                self.assertEqual(context.exception.status_code, 404)
+                self.assertEqual(context.exception.message, CYCLE_NOT_ACTIVE)
