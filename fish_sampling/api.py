@@ -3,7 +3,7 @@ from ninja import Router
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from cycle.services.cycle_service import CycleService
-
+from ninja.responses import Response
 from user_profile.utils import get_supervisor
 from .models import FishSampling
 from pond.models import Pond
@@ -56,8 +56,7 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
             **payload.dict()
         )
         return fish_sampling
-
-
+    
 @router.get("/{pond_id}/{cycle_id}/latest/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
