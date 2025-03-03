@@ -149,48 +149,6 @@ class FishSamplingAPITest(TestCase):
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
 
-    # def test_get_fish_status_normal(self):
-    #         response = self.client.post(
-    #             f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-    #             data=json.dumps({
-    #                 'week': 1,
-    #                 'fish_length': 5.5,
-    #                 'fish_weight': 0.002
-    #             }),
-    #             content_type="application/json",
-    #             headers=self.headers
-    #         )
-    #         self.assertEqual(response.status_code, 200)
-    #         self.assertEqual(response.json()['status'], 'normal')
-
-    # def test_get_fish_status_abnormal_due_to_length(self):
-    #     response = self.client.post(
-    #         f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-    #         data=json.dumps({
-    #             'week': 1,
-    #             'fish_length': 0.001,
-    #             'fish_weight': 0.002
-    #         }),
-    #         content_type="application/json",
-    #         headers=self.headers
-    #     )
-    #     self.assertEqual(response.status_code, 200)
-    #     self.assertEqual(response.json()['status'], 'abnormal')
-
-    # def test_get_fish_status_abnormal_due_to_weight(self):
-    #     response = self.client.post(
-    #         f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-    #         data=json.dumps({
-    #             'week': 1,
-    #             'fish_length': 5.5,
-    #             'fish_weight': 0.3
-    #         }),
-    #         content_type="application/json",
-    #         headers=self.headers
-    #     )
-    #     self.assertEqual(response.status_code, 200)
-    #     self.assertEqual(response.json()['status'], 'abnormal')
-
     def test_get_fish_status_missing_data(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/status/',
@@ -227,8 +185,6 @@ class FishSamplingAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()['detail'], "Data belum tersedia, silakan isi data terlebih dahulu")
-
-
 
 class DetermineFishStatusTest(TestCase):
     def test_determine_fish_status_normal(self):
