@@ -20,3 +20,13 @@ class FishSamplingOutputSchema(Schema):
 class FishSamplingList(Schema):
     fish_samplings: List[FishSamplingOutputSchema]
     cycle_id: UUID4
+
+class FishDeathReportSchema(Schema):
+    pond_id: str
+    dead_fish_count: int
+
+class FishDeathReportOutputSchema(Schema):
+    pond_id: str
+    reporter_id: str
+    dead_fish_count: int
+    recorded_at: datetime

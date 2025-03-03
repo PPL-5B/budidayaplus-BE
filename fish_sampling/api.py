@@ -82,3 +82,26 @@ def list_fish_samplings(request, pond_id: str):
     fish_samplings = FishSampling.objects.filter(cycle=cycle, pond=pond).order_by('-recorded_at')
     return {"fish_samplings": fish_samplings, "cycle_id": cycle.id}
 
+    
+
+@router.post("/report/", auth=JWTAuth(), response={200: FishDeathReportOutputSchema})
+def report_fish_death(request, payload: FishDeathReportSchema):
+    pond = get_object_or_404(Pond, pond_id=payload.pond_id)
+    reporter = get_object_or_404(User, id=request.auth.id)
+    
+    fish_death_report = FishDeathReport.objects.create(
+        pond=pond,
+        reporter=reporter,
+        dead_fish_count=payload.dead_fish_count,
+        recorded_at=make_aware(datetime.now())
+    )
+    return fish_death_report
+
+@router.get("/latest/", auth=JWTAuth(), response={200: FishDeathReportOutputSchema})
+def get_latest_fish_death_report(request):
+    try:
+        fish_death_report = FishDeathReport.objects.filter(reporter=request.auth).latest('recorded_at')
+    except FishDeathReport.DoesNotExist:
+        raise HttpError(404, "No fish death reports found")
+    return fish_death_report
+

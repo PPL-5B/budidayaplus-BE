@@ -16,3 +16,12 @@ class FishSampling(models.Model):
 
     def __str__(self):
         return str(self.sampling_id)
+
+class FishDeathReport(models.Model):
+    pond = models.ForeignKey(Pond, on_delete=models.CASCADE)
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE)
+    dead_fish_count = models.IntegerField()
+    recorded_at = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.pond.name} - {self.dead_fish_count} fish"

@@ -5,6 +5,7 @@ from fish_sampling.api import router as fish_sampling_router
 from pond_quality.api import router as pond_quality_router
 from cycle.api import router as cycle_router
 from food_sampling.api import router as food_sampling_router
+from fish_sampling.api import router as fish_death_router
 from user_profile.api import router as user_profile_router
 from tasks.api import router as tasks_router
 from threshold.api import router as threshold_router
@@ -19,3 +20,4 @@ api.add_router("/profile", user_profile_router)
 api.add_router("/food-sampling/", food_sampling_router)
 api.add_router("/tasks/", tasks_router)
 api.add_router("/threshold/", threshold_router)
+api.add_router("/fish_death/", fish_death_router)
