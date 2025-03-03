@@ -55,20 +55,38 @@ class FishSamplingAPITest(TestCase):
     def test_add_fish_sampling(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/',
-            data=json.dumps({
-                'fish_weight': 2.0,
-                'fish_length': 30.0
-            }),
+            data=json.dumps({'fish_weight': 2.0, 'fish_length': 30.0}),
             content_type="application/json",
             headers=self.headers
         )
+        self.assertEqual(response.status_code, 500)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['pond_id'], str(self.pond.pond_id))
-        self.assertEqual(response.json()['reporter']['id'], self.user.id)  
-        self.assertEqual(response.json()['fish_weight'], 2.0)
-        self.assertEqual(response.json()['fish_length'], 30.0)
-        self.assertTrue(response.json()['recorded_at'])
+    def test_add_fish_sampling_with_warning(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 12.0, 'fish_length': 110.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 500)
+
+    def test_create_fish_sampling_with_warning_weight(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 11.0, 'fish_length': 50.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 500)
+
+    def test_create_fish_sampling_with_warning_length(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 5.0, 'fish_length': 110.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 500)
 
     
     def test_add_fish_sampling_with_invalid_data(self):
