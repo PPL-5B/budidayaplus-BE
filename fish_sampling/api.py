@@ -32,27 +32,30 @@ def check_cycle_active(cycle):
     if not (cycle.start_date <= today <= cycle.end_date):
         raise HttpError(400, CYCLE_NOT_ACTIVE)
 
+@router.post("/{pond_id}/{cycle_id}/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamplingCreateSchema):
     pond = get_object_or_404(Pond, pond_id=pond_id)
     reporter = get_object_or_404(User, id=request.auth.id)
     cycle = get_object_or_404(Cycle, id=cycle_id)
-    supervisor = get_supervisor(user=request.auth)
+    _ = get_supervisor(user=request.auth)
 
     check_cycle_active(cycle)
 
     check_today_fish_sampling(pond, cycle)
-
-    if payload.fish_weight <= 0 or payload.fish_length <= 0:
-        raise HttpError(400, "Berat dan panjang ikan harus lebih dari 0")
     
     # Notifikasi
-    warning_message = None
-    if payload.fish_weight > 10:
-        warning_message = "Berat ikan lebih dari 10 kg, harap pastikan data benar."
-    if payload.fish_length > 100:
-        warning_message = "Panjang ikan lebih dari 100 cm, harap pastikan data benar."
+    if payload.fish_weight <= 0 or payload.fish_length <= 0:
+        return Response({"error": "Berat dan panjang ikan harus lebih dari 0"}, status=400)
+
+    # Validasi batas maksimum
     if payload.fish_weight > 10 and payload.fish_length > 100:
-        warning_message = "Berat dan panjang ikan terlalu besar, harap pastikan data benar."
+        return Response({"error": "Berat dan panjang ikan terlalu besar, harap pastikan data benar."}, status=400)
+    
+    if payload.fish_weight > 10:
+        return Response({"error": "Berat ikan lebih dari 10 kg, harap pastikan data benar."}, status=400)
+
+    if payload.fish_length > 100:
+        return Response({"error": "Panjang ikan lebih dari 100 cm, harap pastikan data benar."}, status=400)
 
     fish_sampling = FishSampling.objects.create(
         pond=pond,
@@ -69,9 +72,6 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
         "fish_length": fish_sampling.fish_length,
         "recorded_at": fish_sampling.recorded_at.isoformat(),
     }
-
-    if warning_message:
-        response_data["warning"] = warning_message # Kirim response ke FE 
 
     return Response(response_data, status=200) # Kirim response ke FE
 
