@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
 from user_profile.models import UserProfile, Worker
-from fish_sampling.api import determine_fish_status
+from fish_sampling.api import determine_fish_status, target_data
 
 class FishSamplingAPITest(TestCase):
     def setUp(self):
@@ -185,6 +185,18 @@ class FishSamplingAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()['detail'], "Data belum tersedia, silakan isi data terlebih dahulu")
+    
+    def test_get_fish_status_valid(self):
+        """Menguji apakah status ikan dihitung dengan benar jika ada data fish sampling"""
+        response = self.client.get(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        expected_week = (make_aware(datetime.now()) - self.cycle.start_date).days // 7 + 1
+        expected_status = determine_fish_status(expected_week, self.fish_sampling.fish_length, self.fish_sampling.fish_weight)
+        self.assertEqual(response.json()['status'], expected_status)
 
 class DetermineFishStatusTest(TestCase):
     def test_determine_fish_status_normal(self):

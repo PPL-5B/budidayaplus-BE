@@ -51,7 +51,6 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
     pond = get_object_or_404(Pond, pond_id=pond_id)
     reporter = get_object_or_404(User, id=request.auth.id)
     cycle = get_object_or_404(Cycle, id=cycle_id)
-    supervisor = get_supervisor(user=request.auth)
 
     check_cycle_active(cycle)
 
@@ -59,8 +58,6 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
 
     if payload.fish_weight <= 0 or payload.fish_length <= 0:
         raise HttpError(400, "Berat dan panjang ikan harus lebih dari 0")
-    elif pond.owner != supervisor:
-        raise HttpError(404, "Data tidak ditemukan")
     else:
         fish_sampling = FishSampling.objects.create(
             pond=pond,
@@ -120,5 +117,5 @@ def get_latest_fish_status(request, pond_id: str, cycle_id: str):
         raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu")
     
     week = (make_aware(datetime.now()) - cycle.start_date).days // 7 + 1
-    status = determine_fish_status(week, fish_sampling.fish_length, fish_sampling.fish_weight)
-    return {"status": status}
+    return {"status": determine_fish_status(week, fish_sampling.fish_length, fish_sampling.fish_weight)}
+
