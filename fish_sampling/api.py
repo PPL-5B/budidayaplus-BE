@@ -32,7 +32,6 @@ def check_cycle_active(cycle):
     if not (cycle.start_date <= today <= cycle.end_date):
         raise HttpError(400, CYCLE_NOT_ACTIVE)
 
-@router.post("/{pond_id}/{cycle_id}/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamplingCreateSchema):
     pond = get_object_or_404(Pond, pond_id=pond_id)
     reporter = get_object_or_404(User, id=request.auth.id)
