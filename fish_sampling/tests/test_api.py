@@ -23,6 +23,7 @@ class FishSamplingAPITest(TestCase):
         self.worker = Worker.objects.create(user=self.user, assigned_supervisor=self.supervisor_profile)
 
         self.pond = Pond.objects.create(
+            owner=self.supervisor,
             name='Test Pond',
             image_name='test_pond.png',
             length=10.0,
@@ -37,7 +38,7 @@ class FishSamplingAPITest(TestCase):
             start_date=start_time,
             end_date=end_time,
         )
-     
+
         self.fish_sampling = FishSampling.objects.create(
             pond=self.pond,
             reporter=self.user,
@@ -46,16 +47,12 @@ class FishSamplingAPITest(TestCase):
             fish_length=25.0,
             recorded_at=make_aware(datetime.now())
         )
-       
+
         # FIXED
         self.token = str(AccessToken.for_user(self.user))
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
     def test_add_fish_sampling(self):
-        response = self.client.post(f'/{self.pond.pond_id}/{self.cycle.id}/', data=json.dumps({    
-            'fish_weight': 2.0,
-            'fish_length': 30.0
-        }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/',
             data=json.dumps({
@@ -65,12 +62,14 @@ class FishSamplingAPITest(TestCase):
             content_type="application/json",
             headers=self.headers
         )
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['pond_id'], str(self.pond.pond_id))
         self.assertEqual(response.json()['reporter']['id'], self.user.id)  
         self.assertEqual(response.json()['fish_weight'], 2.0)
         self.assertEqual(response.json()['fish_length'], 30.0)
         self.assertTrue(response.json()['recorded_at'])
+
     
     def test_add_fish_sampling_with_invalid_data(self):
         response = self.client.post(f'/{self.pond.pond_id}/{self.cycle.id}/', data=json.dumps({
@@ -86,7 +85,9 @@ class FishSamplingAPITest(TestCase):
             f'/{self.pond.pond_id}/{self.cycle.id}/latest/',
             headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
         )
+
         self.assertEqual(response.json()['reporter']['phone_number'], self.fish_sampling.reporter.username)
+
         self.assertEqual(response.json()['fish_weight'], self.fish_sampling.fish_weight)
         self.assertEqual(response.json()['fish_length'], self.fish_sampling.fish_length)
         self.assertTrue(response.json()['recorded_at'])
@@ -117,8 +118,8 @@ class FishSamplingAPITest(TestCase):
     def test_list_fish_samplings_unauthorized(self):
         response = self.client.get(f'/{self.pond.pond_id}/', headers={})
         self.assertEqual(response.status_code, 401) 
-
-     def test_list_fish_samplings(self):
+    
+    def test_list_fish_samplings(self):
      
         response = self.client.get(f'/{self.pond.pond_id}/', headers=self.headers)
 
