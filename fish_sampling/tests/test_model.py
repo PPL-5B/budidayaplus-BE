@@ -5,6 +5,8 @@ from pond.models import Pond
 from cycle.models import Cycle
 from fish_sampling.models import FishSampling
 from django.utils.timezone import make_aware
+import unittest
+from models import FishDeath 
 
 class FishSamplingModelTest(TestCase):
     def setUp(self):
@@ -35,3 +37,16 @@ class FishSamplingModelTest(TestCase):
 
     def test_str_method(self):
         self.assertEqual(str(self.fish_sampling), str(self.fish_sampling.sampling_id))
+
+
+class FishDeathTest(unittest.TestCase):
+    def test_report_fish_death(self):
+        data = {
+            'count': 10,
+            'date': '2025-03-06'
+        }
+        expected_output = "Sebanyak 100 lele mati pada tanggal 2025-03-06"
+        self.assertEqual(report_fish_death(data), expected_output)
+
+if __name__ == '__main__':
+    unittest.main()
