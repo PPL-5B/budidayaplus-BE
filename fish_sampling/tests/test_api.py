@@ -181,6 +181,7 @@ class FishSamplingAPITest(TestCase):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
+        
     def test_get_fish_status_missing_data(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/status/',
