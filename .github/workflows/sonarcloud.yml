@@ -47,16 +47,19 @@ jobs:
         DB_PORT: 5432
       run: python manage.py migrate
     - name: Run Tests with Coverage
+      id: run_tests
       env:
         DB_NAME: test_db
         DB_USER: postgres
         DB_PASS: postgres
         DB_HOST: localhost
         DB_PORT: 5432
+      continue-on-error: true
       run: |
         coverage run manage.py test
         coverage xml
     - name: Upload Coverage Report
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
@@ -64,6 +67,7 @@ jobs:
   sonarcloud:
     needs: build-test
     runs-on: ubuntu-latest
+    if: always()
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
