@@ -137,6 +137,6 @@ def get_latest_fish_status(request, pond_id: str, cycle_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu")
     
-    week = (make_aware(datetime.now()) - cycle.start_date).days // 7 + 1
+    week = (make_aware(datetime.now()) - make_aware(datetime.combine(cycle.start_date, datetime.min.time()))).days // 7 + 1
     return {"status": determine_fish_status(week, fish_sampling.fish_length, fish_sampling.fish_weight)}
 
