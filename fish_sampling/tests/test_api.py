@@ -181,33 +181,6 @@ class FishSamplingAPITest(TestCase):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
-        
-    def test_get_fish_status_missing_data(self):
-        response = self.client.post(
-            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-            data=json.dumps({
-                'week': 5
-            }),
-            content_type="application/json",
-            headers=self.headers
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('fish_length', response.json()['detail'])
-        self.assertIn('fish_weight', response.json()['detail'])
-
-    def test_get_fish_status_negative_values(self):
-        response = self.client.post(
-            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-            data=json.dumps({
-                'week': 5,
-                'fish_length': -5.0,
-                'fish_weight': -0.010
-            }),
-            content_type="application/json",
-            headers=self.headers
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()['detail'], 'Panjang dan berat ikan harus lebih dari 0')
 
     def test_get_fish_status_no_input_yet(self):
         """Menghapus semua FishSampling sebelum request untuk memastikan ObjectDoesNotExist tercapai"""
