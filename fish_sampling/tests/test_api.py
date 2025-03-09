@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
 from user_profile.models import UserProfile, Worker
+from fish_sampling.api import determine_fish_status, target_data
 
 class FishSamplingAPITest(TestCase):
     def setUp(self):
@@ -180,3 +181,74 @@ class FishSamplingAPITest(TestCase):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
+    def test_get_fish_status_missing_data(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            data=json.dumps({
+                'week': 5
+            }),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('fish_length', response.json()['detail'])
+        self.assertIn('fish_weight', response.json()['detail'])
+
+    def test_get_fish_status_negative_values(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            data=json.dumps({
+                'week': 5,
+                'fish_length': -5.0,
+                'fish_weight': -0.010
+            }),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['detail'], 'Panjang dan berat ikan harus lebih dari 0')
+
+    def test_get_fish_status_no_input_yet(self):
+        """Menghapus semua FishSampling sebelum request untuk memastikan ObjectDoesNotExist tercapai"""
+        FishSampling.objects.all().delete()
+        response = self.client.get(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], "Data belum tersedia, silakan isi data terlebih dahulu")
+    
+    def test_get_fish_status_valid(self):
+        """Menguji apakah status ikan dihitung dengan benar jika ada data fish sampling"""
+        response = self.client.get(
+            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
+            headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        expected_week = (make_aware(datetime.now()) - self.cycle.start_date).days // 7 + 1
+        expected_status = determine_fish_status(expected_week, self.fish_sampling.fish_length, self.fish_sampling.fish_weight)
+        self.assertEqual(response.json()['status'], expected_status)
+
+class DetermineFishStatusTest(TestCase):
+    def test_determine_fish_status_normal(self):
+        """Pastikan ikan dikategorikan normal jika berada dalam margin 20% dari target"""
+        self.assertEqual(determine_fish_status(1, 5.5, 0.002), "normal")  # Sesuai target
+        self.assertEqual(determine_fish_status(1, 6.0, 0.0021), "normal")  # Sedikit di atas
+        self.assertEqual(determine_fish_status(1, 5.0, 0.0019), "normal")  # Sedikit di bawah
+
+    def test_determine_fish_status_abnormal_due_to_length(self):
+        """Pastikan ikan dikategorikan abnormal jika panjang melebihi 20% target"""
+        self.assertEqual(determine_fish_status(1, 7.0, 0.002), "abnormal")  # 27% lebih panjang
+        self.assertEqual(determine_fish_status(1, 4.0, 0.002), "abnormal")  # 27% lebih pendek
+
+    def test_determine_fish_status_abnormal_due_to_weight(self):
+        """Pastikan ikan dikategorikan abnormal jika berat melebihi 20% target"""
+        self.assertEqual(determine_fish_status(1, 5.5, 0.003), "abnormal")  # Berat lebih dari 20% target
+        self.assertEqual(determine_fish_status(1, 5.5, 0.001), "abnormal")  # Berat kurang dari 20% target
+
+    def test_determine_fish_status_invalid_week(self):
+        """Pastikan jika week di luar 1-9, return invalid_week"""
+        self.assertEqual(determine_fish_status(0, 5.5, 0.002), "invalid_week")
+        self.assertEqual(determine_fish_status(10, 5.5, 0.002), "invalid_week")
+        
