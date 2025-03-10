@@ -10,7 +10,7 @@ class FilterServiceImpl(FilterService):
         return FilterRepo.filter_tasks(cycle_id=cycle_id, period=period, assignee_username=assignee_username)
 
     @staticmethod
-    def filter_tasks_by_date(cycle_id: str, date: date | None = None):  
+    def filter_tasks_by_date(cycle_id: str, date: date = None):  
         if date is None:  
             date = now().date() 
         return FilterRepo.filter_tasks_by_date(cycle_id=cycle_id, date=date)

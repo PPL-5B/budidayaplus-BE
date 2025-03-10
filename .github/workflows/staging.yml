@@ -5,7 +5,7 @@ on:
       - main
   pull_request:
     branches:
-      - dev
+      - main
     types:
       - closed
 
@@ -24,7 +24,7 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << 'EOF'
           cd /home/andromeda/dkn/budidayaplus
-          git pull origin ci-cd
+          git pull origin dev
           docker-compose down
           rm .env
           touch .env
