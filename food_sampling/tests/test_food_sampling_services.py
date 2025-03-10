@@ -83,8 +83,8 @@ class FoodSamplingServiceTest(TestCase):
         self.mock_repository.get_food_sampling_by_id.return_value = self.mock_food_sampling
         self.mock_food_sampling.cycle = self.mock_cycle
         self.mock_food_sampling.pond = self.mock_pond
-        self.mock_food_sampling.reporter = MagicMock()  # Different reporter to simulate unauthorized access
-        self.mock_pond.owner = MagicMock()  # Different owner to simulate unauthorized access
+        self.mock_food_sampling.reporter = MagicMock()  
+        self.mock_pond.owner = MagicMock()  
 
         with self.assertRaises(HttpError) as context:
             self.service.get_food_sampling('cycle_id', 'pond_id', 'sampling_id', self.mock_user)
@@ -114,33 +114,24 @@ class FoodSamplingServiceTest(TestCase):
     @patch('user_profile.utils.get_supervisor')
     @patch('cycle.repositories.cycle_repo.CycleRepo.get_active_cycle') 
     def test_list_food_samplings(self, mock_get_active_cycle, mock_get_supervisor):
-        # Setup mock return values
         self.mock_repository.list_food_samplings.return_value = [self.mock_food_sampling]
         self.mock_cycle.supervisor = self.mock_user
         
-        # Mock CycleRepo.get_active_cycle instead of repository.get_active_cycle
-        # Create the patch for the static method
         with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
             mock_get_active_cycle.return_value = self.mock_cycle
-            
-            # Mock get_supervisor function
+        
             with patch('food_sampling.services.food_sampling_service.get_supervisor') as mock_get_supervisor:
                 mock_get_supervisor.return_value = self.mock_user
                 
-                # Mock the authorize_user method to return False (assuming it should allow access)
                 self.service.authorize_user = MagicMock(return_value=False)
                 
-                # Call the method with correct parameters
                 result = self.service.list_food_samplings('pond_id', self.mock_user)
                 
-                # Verify the static method was called correctly
                 mock_get_active_cycle.assert_called_once_with(self.mock_user)
                 
-                # Verify other repository methods were called correctly
                 self.mock_repository.get_pond.assert_called_once_with('pond_id')
                 self.mock_repository.list_food_samplings.assert_called_once_with(self.mock_cycle, self.mock_pond)
                 
-                # Verify the result matches expected output
                 expected_result = {
                     'food_samplings': [self.mock_food_sampling],
                     'cycle_id': self.mock_cycle.id
@@ -152,18 +143,14 @@ class FoodSamplingServiceTest(TestCase):
         self.mock_cycle.end_date = datetime.now().date() + timedelta(days=30)
         self.mock_cycle.supervisor = MagicMock()
         
-        # Mock CycleRepo.get_active_cycle
         with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
             mock_get_active_cycle.return_value = self.mock_cycle
             
-            # Mock get_supervisor function
             with patch('food_sampling.services.food_sampling_service.get_supervisor') as mock_get_supervisor:
                 mock_get_supervisor.return_value = self.mock_user
                 
-                # Mock the authorize_user method to return True (to trigger unauthorized access)
                 self.service.authorize_user = MagicMock(return_value=True)
                 
-                # Now test for the exception
                 with self.assertRaises(HttpError) as context:
                     self.service.list_food_samplings('pond_id', self.mock_user)
                     
@@ -201,4 +188,4 @@ class FoodSamplingServiceTest(TestCase):
             service.create_food_sampling("pond-123", "cycle-456", 2, FoodSamplingCreateSchema(food_quantity=1200, recorded_at=datetime.now()))
 
         self.assertEqual(excinfo.exception.status_code, 400)
-        self.assertEqual(str(excinfo.exception), "Input kuantitas makanan tidak valid")
+        self.assertEqual(str(excinfo.exception), "Gagal menyimpan sample makanan")
