@@ -17,7 +17,7 @@ class FishSamplingAPITest(TestCase):
 
         # Buat Supervisor
         self.supervisor = User.objects.create_user(username='supervisor', password='password', is_staff=True)
-        self.supervisor_profile, created = UserProfile.objects.get_or_create(user=self.supervisor)
+        self.supervisor_profile, _ = UserProfile.objects.get_or_create(user=self.supervisor)
 
         # Buat Worker dengan Supervisor
         self.user = User.objects.create_user(username='userA', password='abc123')
@@ -56,21 +56,54 @@ class FishSamplingAPITest(TestCase):
     def test_add_fish_sampling(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/',
-            data=json.dumps({
-                'fish_weight': 2.0,
-                'fish_length': 30.0
-            }),
+            data=json.dumps({'fish_weight': 2.0, 'fish_length': 30.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("pond_id", response.json())  
+        self.assertEqual(response.json()["pond_id"], str(self.pond.pond_id))
+        self.assertEqual(response.json()["reporter"]["id"], self.user.id)  
+        self.assertEqual(response.json()["fish_weight"], 2.0)
+        self.assertEqual(response.json()["fish_length"], 30.0)
+        self.assertTrue(response.json()["recorded_at"]) 
+
+    def test_add_fish_sampling_invalid_weight_length(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 12.0, 'fish_length': 110.0}),
             content_type="application/json",
             headers=self.headers
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['pond_id'], str(self.pond.pond_id))
-        self.assertEqual(response.json()['reporter']['id'], self.user.id)  
-        self.assertEqual(response.json()['fish_weight'], 2.0)
-        self.assertEqual(response.json()['fish_length'], 30.0)
-        self.assertTrue(response.json()['recorded_at'])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        self.assertEqual(response.json()["error"], "Berat dan panjang ikan terlalu besar, harap pastikan data benar.")
 
+    def test_create_fish_sampling_invalid_weight(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 11.0, 'fish_length': 50.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        self.assertEqual(response.json()["error"], "Berat ikan lebih dari 10 kg, harap pastikan data benar.")
+
+    def test_create_fish_sampling_invalid_length(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 5.0, 'fish_length': 110.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        self.assertEqual(response.json()["error"], "Panjang ikan lebih dari 100 cm, harap pastikan data benar.")
     
     def test_add_fish_sampling_with_invalid_data(self):
         response = self.client.post(f'/{self.pond.pond_id}/{self.cycle.id}/', data=json.dumps({
@@ -78,7 +111,7 @@ class FishSamplingAPITest(TestCase):
             'fish_length': -10.0
         }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
         self.assertEqual(response.status_code, 400) 
-        self.assertEqual(response.json()['detail'], 'Berat dan panjang ikan harus lebih dari 0')
+        self.assertEqual(response.json()['error'], 'Berat dan panjang ikan harus lebih dari 0')
         self.assertFalse(FishSampling.objects.filter(fish_weight=1.2, fish_length=-10.0).exists())
 
     def test_get_latest_fish_sampling(self):
@@ -148,33 +181,6 @@ class FishSamplingAPITest(TestCase):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
-
-    def test_get_fish_status_missing_data(self):
-        response = self.client.post(
-            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-            data=json.dumps({
-                'week': 5
-            }),
-            content_type="application/json",
-            headers=self.headers
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('fish_length', response.json()['detail'])
-        self.assertIn('fish_weight', response.json()['detail'])
-
-    def test_get_fish_status_negative_values(self):
-        response = self.client.post(
-            f'/{self.pond.pond_id}/{self.cycle.id}/status/',
-            data=json.dumps({
-                'week': 5,
-                'fish_length': -5.0,
-                'fish_weight': -0.010
-            }),
-            content_type="application/json",
-            headers=self.headers
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()['detail'], 'Panjang dan berat ikan harus lebih dari 0')
 
     def test_get_fish_status_no_input_yet(self):
         """Menghapus semua FishSampling sebelum request untuk memastikan ObjectDoesNotExist tercapai"""

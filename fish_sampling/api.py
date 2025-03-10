@@ -3,7 +3,7 @@ from ninja import Router
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from cycle.services.cycle_service import CycleService
-
+from ninja.responses import Response
 from user_profile.utils import get_supervisor
 from .models import FishSampling
 from pond.models import Pond
@@ -51,24 +51,45 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
     pond = get_object_or_404(Pond, pond_id=pond_id)
     reporter = get_object_or_404(User, id=request.auth.id)
     cycle = get_object_or_404(Cycle, id=cycle_id)
+    _ = get_supervisor(user=request.auth)
 
     check_cycle_active(cycle)
 
     check_today_fish_sampling(pond, cycle)
-
+    
+    # Notifikasi
     if payload.fish_weight <= 0 or payload.fish_length <= 0:
-        raise HttpError(400, "Berat dan panjang ikan harus lebih dari 0")
-    else:
-        fish_sampling = FishSampling.objects.create(
-            pond=pond,
-            reporter=reporter,
-            cycle=cycle,
-            recorded_at=make_aware(datetime.now()),
-            **payload.dict()
-        )
-        return fish_sampling
+        return Response({"error": "Berat dan panjang ikan harus lebih dari 0"}, status=400)
 
+    # Validasi batas maksimum
+    if payload.fish_weight > 10 and payload.fish_length > 100:
+        return Response({"error": "Berat dan panjang ikan terlalu besar, harap pastikan data benar."}, status=400)
+    
+    if payload.fish_weight > 10:
+        return Response({"error": "Berat ikan lebih dari 10 kg, harap pastikan data benar."}, status=400)
 
+    if payload.fish_length > 100:
+        return Response({"error": "Panjang ikan lebih dari 100 cm, harap pastikan data benar."}, status=400)
+
+    fish_sampling = FishSampling.objects.create(
+        pond=pond,
+        reporter=reporter,
+        cycle=cycle,
+        recorded_at=make_aware(datetime.now()),
+        **payload.dict()
+    )
+
+    response_data = {
+        "pond_id": str(fish_sampling.pond.pond_id),
+        "reporter": {"id": fish_sampling.reporter.id},
+        "fish_weight": fish_sampling.fish_weight,
+        "fish_length": fish_sampling.fish_length,
+        "recorded_at": fish_sampling.recorded_at.isoformat(),
+    }
+
+    return Response(response_data, status=200) # Kirim response ke FE
+
+    
 @router.get("/{pond_id}/{cycle_id}/latest/", auth=JWTAuth(), response={200: FishSamplingOutputSchema})
 def get_latest_fish_sampling(request, pond_id: str, cycle_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
@@ -116,6 +137,6 @@ def get_latest_fish_status(request, pond_id: str, cycle_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu")
     
-    week = (make_aware(datetime.now()) - cycle.start_date).days // 7 + 1
+    week = (make_aware(datetime.now()) - make_aware(datetime.combine(cycle.start_date, datetime.min.time()))).days // 7 + 1
     return {"status": determine_fish_status(week, fish_sampling.fish_length, fish_sampling.fish_weight)}
 
