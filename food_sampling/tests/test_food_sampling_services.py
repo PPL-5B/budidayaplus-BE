@@ -142,7 +142,6 @@ class FoodSamplingServiceTest(TestCase):
         self.mock_cycle.start_date = datetime.now().date() - timedelta(days=30)
         self.mock_cycle.end_date = datetime.now().date() + timedelta(days=30)
         self.mock_cycle.supervisor = MagicMock()
-        
         with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
             mock_get_active_cycle.return_value = self.mock_cycle
             
