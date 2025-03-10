@@ -9,8 +9,6 @@ from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
 from rest_framework_simplejwt.tokens import AccessToken
 from user_profile.models import UserProfile, Worker
-from django.core.exceptions import ObjectDoesNotExist  
-from django.db import IntegrityError  
 
 class FishSamplingAPITest(TestCase):
     def setUp(self):
