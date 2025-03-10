@@ -1,4 +1,3 @@
-from typing import List
 from ninja import Router
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -119,8 +118,8 @@ def determine_fish_status(week: int, fish_length: float, fish_weight: float) -> 
     if not target:
         return "invalid_week"
     
-    length_threshold = target['fish_length'] * 0.2  # 20% margin
-    weight_threshold = target['fish_weight'] * 0.2  # 20% margin
+    length_threshold = target['fish_length'] * 0.2  
+    weight_threshold = target['fish_weight'] * 0.2  
     
     if abs(fish_length - target['fish_length']) > length_threshold or abs(fish_weight - target['fish_weight']) > weight_threshold:
         return "abnormal"
@@ -139,4 +138,3 @@ def get_latest_fish_status(request, pond_id: str, cycle_id: str):
     
     week = (make_aware(datetime.now()) - make_aware(datetime.combine(cycle.start_date, datetime.min.time()))).days // 7 + 1
     return {"status": determine_fish_status(week, fish_sampling.fish_length, fish_sampling.fish_weight)}
-
