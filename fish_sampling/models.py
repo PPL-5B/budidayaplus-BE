@@ -23,7 +23,7 @@ class FishDeath(models.Model):
     reporter = models.ForeignKey(User, on_delete=models.CASCADE)
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE)
     count = models.PositiveIntegerField()
-    date = models.DateField()
+    recorded_at = models.DateField()
 
     def __str__(self):
         return str(self.death_id)
