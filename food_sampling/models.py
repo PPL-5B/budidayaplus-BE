@@ -19,7 +19,7 @@ class FoodSampling(models.Model):
 
 # hello ngetes sonar
 
-def fish_death_notification(models.Model):
+class fish_death_notification(models.Model):
     count = models.IntegerField()
     report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE)
