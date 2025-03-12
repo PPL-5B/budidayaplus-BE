@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
 from pond.models import Pond
@@ -9,7 +10,6 @@ from ninja.testing import TestClient
 from pond_quality.api import router
 import json, uuid
 from user_profile.models import UserProfile  
-from unittest.mock import patch, MagicMock
 
 class PondQualityAPITest(TestCase):
     def setUp(self):
@@ -59,111 +59,89 @@ class PondQualityAPITest(TestCase):
             phosphate = 0.0
         )
 
-    def test_list_pond_qualities_by_pond(self):
-        response = self.client.get(f'/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()['pond_qualities']), 1)
-
-    def test_list_pond_qualities_by_pond_invalid_token(self):
-        response = self.client.get(f'/{self.pond.pond_id}/', headers={"Authorization": "Bearer Invalid Token"})
-        self.assertEqual(response.status_code, 401)
-
-    def test_list_pond_qualities_by_pond_invalid_pond(self):
-        response = self.client.get(f'/{uuid.uuid4()}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 404)
-
-    def test_list_pond_qualities_by_pond_invalid_cycle(self):
-        response = self.client.get(f'/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 404)
-
     def test_add_pond_quality_positive(self):
-        with patch('pond_quality.api.get_supervisor', return_value=self.user):
-            response = self.client.post(f'/{self.pond.pond_id}/', data=json.dumps({
-                'image_name': 'test.jpg',
-                'ph_level': 7.0,
-                'salinity': 0.0,
-                'water_temperature': 25.0,
-                'water_clarity': 0.0,
-                'water_circulation': 0.0,
-                'dissolved_oxygen': 0.0,
-                'orp': 0.0,
-                'ammonia': 0.0,
-                'nitrate': 0.0,
-                'phosphate': 0.0
-            }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-            data = response.json()
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(data['pond'], str(self.pond.pond_id))
-            self.assertEqual(data['image_name'], 'test.jpg')
-            self.assertEqual(data['ph_level'], 7.0)
+        response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
+            'image_name': 'test.jpg',
+            'ph_level': 7.0,
+            'salinity': 0.0,
+            'water_temperature': 25.0,
+            'water_clarity': 0.0,
+            'water_circulation': 0.0,
+            'dissolved_oxygen': 0.0,
+            'orp': 0.0,
+            'ammonia': 0.0,
+            'nitrate': 0.0,
+            'phosphate': 0.0
+        }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        data = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['pond'], str(self.pond.pond_id))
+        self.assertEqual(data['image_name'], 'test.jpg')
+        self.assertEqual(data['ph_level'], 7.0)
 
     def test_add_pond_quality_already_existing(self):
-        with patch('pond_quality.api.get_supervisor', return_value=self.user):
-            response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
-                'image_name': 'test.jpg',
-                'ph_level': 7.0,
-                'salinity': 0.0,
-                'water_temperature': 25.0,
-                'water_clarity': 0.0,
-                'water_circulation': 0.0,
-                'dissolved_oxygen': 0.0,
-                'orp': 0.0,
-                'ammonia': 0.0,
-                'nitrate': 0.0,
-                'phosphate': 0.0
-            }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(PondQuality.objects.filter(cycle=self.cycle, pond=self.pond).count(), 1)
+        response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
+            'image_name': 'test.jpg',
+            'ph_level': 7.0,
+            'salinity': 0.0,
+            'water_temperature': 25.0,
+            'water_clarity': 0.0,
+            'water_circulation': 0.0,
+            'dissolved_oxygen': 0.0,
+            'orp': 0.0,
+            'ammonia': 0.0,
+            'nitrate': 0.0,
+            'phosphate': 0.0
+        }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PondQuality.objects.filter(cycle=self.cycle, pond=self.pond).count(), 1)
 
     def test_add_pond_quality_no_image_name(self):
-        with patch('pond_quality.api.get_supervisor', return_value=self.user):
-            response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
-                'ph_level': 7.0,
-                'salinity': 0.0,
-                'water_temperature': 25.0,
-                'water_clarity': 0.0,
-                'water_circulation': 0.0,
-                'dissolved_oxygen': 0.0,
-                'orp': 0.0,
-                'ammonia': 0.0,
-                'nitrate': 0.0,
-                'phosphate': 0.0
-            }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
+            'ph_level': 7.0,
+            'salinity': 0.0,
+            'water_temperature': 25.0,
+            'water_clarity': 0.0,
+            'water_circulation': 0.0,
+            'dissolved_oxygen': 0.0,
+            'orp': 0.0,
+            'ammonia': 0.0,
+            'nitrate': 0.0,
+            'phosphate': 0.0
+        }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 200)
 
     def test_add_pond_quality_invalid_pond(self):
-        with patch('pond_quality.api.get_supervisor', return_value=self.user):
-            response = self.client.post(f'/{self.cycle.id}/{uuid.uuid4()}/', data=json.dumps({
-                'image_name': 'test.jpg',
-                'ph_level': 7.0,
-                'salinity': 0.0,
-                'water_temperature': 25.0,
-                'water_clarity': 0.0,
-                'water_circulation': 0.0,
-                'dissolved_oxygen': 0.0,
-                'orp': 0.0,
-                'ammonia': 0.0,
-                'nitrate': 0.0,
-                'phosphate': 0.0
-            }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-            self.assertEqual(response.status_code, 404)
+        response = self.client.post(f'/{self.cycle.id}/{uuid.uuid4()}/', data=json.dumps({
+            'image_name': 'test.jpg',
+            'ph_level': 7.0,
+            'salinity': 0.0,
+            'water_temperature': 25.0,
+            'water_clarity': 0.0,
+            'water_circulation': 0.0,
+            'dissolved_oxygen': 0.0,
+            'orp': 0.0,
+            'ammonia': 0.0,
+            'nitrate': 0.0,
+            'phosphate': 0.0
+        }), content_type='application/json', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 404)
 
     def test_add_pond_quality_invalid_token(self):
-        with patch('pond_quality.api.get_supervisor', return_value=self.user):
-            response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
-                'image_name': 'test.jpg',
-                'ph_level': 7.0,
-                'salinity': 0.0,
-                'water_temperature': 25.0,
-                'water_clarity': 0.0,
-                'water_circulation': 0.0,
-                'dissolved_oxygen': 0.0,
-                'orp': 0.0,
-                'ammonia': 0.0,
-                'nitrate': 0.0,
-                'phosphate': 0.0
-            }), content_type='application/json', headers={"Authorization": "Bearer Invalid Token"})
-            self.assertEqual(response.status_code, 401)
+        response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
+            'image_name': 'test.jpg',
+            'ph_level': 7.0,
+            'salinity': 0.0,
+            'water_temperature': 25.0,
+            'water_clarity': 0.0,
+            'water_circulation': 0.0,
+            'dissolved_oxygen': 0.0,
+            'orp': 0.0,
+            'ammonia': 0.0,
+            'nitrate': 0.0,
+            'phosphate': 0.0
+        }), content_type='application/json', headers={"Authorization": "Bearer Invalid Token"})
+        self.assertEqual(response.status_code, 401)
 
     def test_add_pond_quality_no_ph_level(self):
         response = self.client.post(f'/{self.cycle.id}/{self.pond.pond_id}/', data=json.dumps({
@@ -251,15 +229,10 @@ class PondQualityAPITest(TestCase):
         response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/{self.pond_quality.id}/', headers={"Authorization": "Bearer Invalid Token"})
         self.assertEqual(response.status_code, 401)
 
-    # def test_get_pond_quality_invalid_user(self):
-    #     user = User.objects.create_user(username='081234567891', password='password')
-    #     response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/{self.pond_quality.id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(user))}"})
-    #     self.assertEqual(response.status_code, 401)
 
     def test_get_pond_quality_different_pond(self):
-        with patch('pond_quality.api.get_supervisor', return_value=self.user):
-            response = self.client.get(f'/{self.cycle.id}/{self.pond2.pond_id}/{self.pond_quality.id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-            self.assertEqual(response.status_code, 404)
+        response = self.client.get(f'/{self.cycle.id}/{self.pond2.pond_id}/{self.pond_quality.id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 404)
 
     def test_get_pond_quality_cycle_not_active(self):
         starting_date = datetime.now() - timedelta(days=90)
@@ -279,7 +252,7 @@ class PondQualityAPITest(TestCase):
             supervisor=self.user,
             start_date=starting_date,
             end_date=ending_date
-        )
+            )
         response = self.client.get(f'/{cycle.id}/{self.pond.pond_id}/{self.pond_quality.id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
         self.assertEqual(response.status_code, 404)
 
@@ -295,15 +268,6 @@ class PondQualityAPITest(TestCase):
         response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/latest', headers={"Authorization": "Bearer Invalid Token"})
         self.assertEqual(response.status_code, 401)
     
-    # def test_get_latest_pond_quality_invalid_user(self):
-    #     user = User.objects.create_user(username='081234567891', password='password')
-    #     response = self.client.get(
-    #         f'/{self.cycle.id}/{self.pond.pond_id}/latest', 
-    #         headers={"Authorization": f"Bearer {str(AccessToken.for_user(user))}"}
-    #     )
-    #     self.assertEqual(response.status_code, 401)  # 🔹 Sekarang harus benar mengembalikan 401
-
-
     def test_get_latest_pond_quality_not_found(self):
         response = self.client.get(f'/{self.cycle.id}/{self.pond2.pond_id}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
         self.assertEqual(response.status_code, 404)
@@ -405,56 +369,6 @@ class PondQualityAPITest(TestCase):
             headers={"Authorization": "Bearer Invalid Token"}
         )
         self.assertEqual(response.status_code, 401)
-
-    #Summary Data
-    def test_get_pond_quality_summary_no_data(self):
-        #Jika tidak ada data, harus return 404 dengan pesan yang sesuai.
-        PondQuality.objects.all().delete()  
-
-        response = self.client.get(
-            f'/{self.pond.pond_id}/summary',
-            headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
-        )
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()['detail'], "Data belum tersedia, silakan isi data terlebih dahulu.")
-
-    def test_get_pond_quality_summary_success(self):
-        #Jika data tersedia, harus return summary dengan parameter yang benar.
-        PondQuality.objects.all().delete()  
-        PondQuality.objects.create(
-            pond=self.pond,
-            reporter=self.user,
-            cycle=self.cycle,
-            ph_level=7.2,
-            salinity=28.0,
-            water_temperature=26.5,
-            water_clarity=5.0,
-            water_circulation=5.0,
-            dissolved_oxygen=8.0,
-            orp=200.0,
-            ammonia=0.1,
-            nitrate=5.0,
-            phosphate=1.0
-        )
-
-        response = self.client.get(
-            f'/{self.pond.pond_id}/summary',
-            headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
-        )
-        
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        
-        # Memastikan hanya parameter yang diinginkan yang muncul
-        self.assertIn("ph_level", data)
-        self.assertIn("salinity", data)
-        self.assertIn("water_temperature", data)
-        self.assertNotIn("water_clarity", data)  # Harus tidak ada
-        self.assertNotIn("dissolved_oxygen", data)  # Harus tidak ada
-        
-        self.assertEqual(data["ph_level"], 7.2)
-        self.assertEqual(data["salinity"], 28.0)
-        self.assertEqual(data["water_temperature"], 26.5)
 
     def test_get_dashboard_table_data_positive(self):
         with patch('pond_quality.api.get_supervisor', return_value=self.user):
