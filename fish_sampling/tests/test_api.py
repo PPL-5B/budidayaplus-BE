@@ -147,3 +147,123 @@ class FishSamplingAPITest(TestCase):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
         self.assertEqual(response.status_code, 404) 
+
+    def test_fish_death(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/death/',
+            data=json.dumps({
+                'count': 10
+            }),
+            content_type="application/json",
+            headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['pond_id'], str(self.pond.pond_id))
+        self.assertEqual(response.json()['reporter']['id'], self.user.id)  
+        self.assertEqual(response.json()['count'], 10)
+        self.assertTrue(response.json()['recorded_at'])
+
+    def test_fish_death_with_invalid_data(self):
+        response = self.client.post(f'/{self.pond.pond_id}/death/', data=json.dumps({
+            'count': -10
+        }), content_type='application/json', headers=self.headers)
+        self.assertEqual(response.status_code, 400) 
+        self.assertEqual(response.json()['detail'], 'Jumlah ikan mati harus minimal sama dengan 0')
+        self.assertFalse(FishDeath.objects.filter(count=-10).exists())
+
+    def test_fish_death_invalid_pond(self):
+        response = self.client.post(f'/{uuid.uuid4()}/death/', data=json.dumps({
+            'count': 10
+        }), content_type='application/json', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], 'Not Found')
+
+    def test_fish_death_unauthorized(self):
+        response = self.client.post(f'/{self.pond.pond_id}/death/', data=json.dumps({
+            'count': 10
+        }), content_type='application/json', headers={})
+        self.assertEqual(response.status_code, 401)
+
+    def test_fish_death_cycle_not_active(self):
+        starting_date = datetime.now() - timedelta(days=90)
+        ending_date = starting_date + timedelta(days=60)
+        cycle = Cycle.objects.create(
+            supervisor=self.user,
+            start_date=starting_date,
+            end_date=ending_date
+        )
+        response = self.client.post(f'/{self.pond.pond_id}/death/', data=json.dumps({
+            'count': 10
+        }), content_type='application/json', headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['detail'], 'Siklus tidak aktif')
+
+    def test_get_latest_fish_death(self):
+        response = self.client.get(
+            f'/{self.pond.pond_id}/death/latest/',
+            headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
+        )
+
+        self.assertEqual(response.json()['reporter']['phone_number'], self.fish_death.reporter.username)
+        self.assertEqual(response.json()['count'], self.fish_death.count)
+
+    def test_get_latest_fish_death_no_data(self):
+        FishDeath.objects.all().delete()
+        response = self.client.get(f'/{self.pond.pond_id}/death/latest/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], 'Data tidak ditemukan')
+
+    def test_get_latest_fish_death_cycle_not_active(self):
+        starting_date = datetime.now() - timedelta(days=90)
+        ending_date = starting_date + timedelta(days=60)
+        cycle = Cycle.objects.create(
+            supervisor=self.user,
+            start_date=starting_date,
+            end_date=ending_date
+        )
+        response = self.client.get(f'/{self.pond.pond_id}/death/latest/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['detail'], 'Siklus tidak aktif')
+
+    def test_get_fish_death_invalid_pond(self):
+        response = self.client.get(f'/{uuid.uuid4()}/death/latest/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], 'Not Found')
+
+    def test_list_fish_deaths_unauthorized(self):
+        response = self.client.get(f'/{self.pond.pond_id}/death/', headers={})
+        self.assertEqual(response.status_code, 401)
+
+    def test_list_fish_deaths(self):
+        response = self.client.get(f'/{self.pond.pond_id}/death/', headers=self.headers)
+
+        self.assertEqual(response.status_code, 200, "Status response seharusnya 200")
+
+        # Ambil daftar fish deaths dari response API
+        fish_deaths = response.json().get('fish_deaths', [])
+
+        # Cek apakah jumlah fish deaths lebih dari 0
+        self.assertGreaterEqual(len(fish_deaths), 1, "Fish death data kurang dari 1")
+
+        # Cek data fish death pertama
+        self.assertEqual(fish_deaths[0]['death_report_id'], str(self.fish_death.death_report_id))
+        self.assertEqual(fish_deaths[0]['pond_id'], str(self.fish_death.pond.pond_id))
+
+        # Cek data fish death kedua hanya jika ada cukup data
+        if len(fish_deaths) > 1:
+            self.assertEqual(fish_deaths[1]['death_report_id'], str(self.fish_death_userA.death_report_id))
+            self.assertEqual(fish_deaths[1]['pond_id'], str(self.fish_death_userA.pond.pond_id))
+
+        # Cek apakah cycle_id sesuai
+        self.assertEqual(response.json()['cycle_id'], str(self.cycle.id))
+
+    def test_list_fish_deaths_by_pond_invalid_cycle(self):
+        invalid_pond_id = uuid.uuid4()
+        response = self.client.get(f'/{invalid_pond_id}/death/', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+
+    
+
+    
+

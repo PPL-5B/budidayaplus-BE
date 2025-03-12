@@ -18,7 +18,7 @@ class FishSampling(models.Model):
         return str(self.sampling_id)
 
 class FishDeath(models.Model):
-    death_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    death_report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pond = models.ForeignKey(Pond, on_delete=models.CASCADE)
     reporter = models.ForeignKey(User, on_delete=models.CASCADE)
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE)

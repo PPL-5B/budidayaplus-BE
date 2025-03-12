@@ -5,10 +5,10 @@ from django.contrib.auth.models import User
 from cycle.services.cycle_service import CycleService
 
 from user_profile.utils import get_supervisor
-from .models import FishSampling
+from .models import FishSampling, FishDeath
 from pond.models import Pond
 from cycle.models import Cycle
-from .schemas import FishSamplingCreateSchema, FishSamplingOutputSchema, FishSamplingList
+from .schemas import FishSamplingCreateSchema, FishSamplingOutputSchema, FishSamplingList, FishDeathCreateSchema, FishDeathOutputSchema
 from ninja_jwt.authentication import JWTAuth
 from ninja.errors import HttpError
 from datetime import datetime
@@ -82,3 +82,39 @@ def list_fish_samplings(request, pond_id: str):
     fish_samplings = FishSampling.objects.filter(cycle=cycle, pond=pond).order_by('-recorded_at')
     return {"fish_samplings": fish_samplings, "cycle_id": cycle.id}
 
+
+@router.get("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: FishDeathOutputSchema})
+def reporting_fish_death(request, pond_id: str, cycle_id: str, payload: FishDeathCreateSchema):
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+    reporter = get_object_or_404(User, id=request.auth.id)
+    cycle = get_object_or_404(Cycle, id=cycle_id)
+    supervisor = get_supervisor(user=request.auth)
+
+    check_cycle_active(cycle)
+
+    if payload.count < 0 :
+        raise HttpError(400, "Jumlah kematian minimal 0")
+    elif pond.owner != supervisor:
+        raise HttpError(404, "Data tidak ditemukan")
+    else:
+        fish_death_count = FishDeath.objects.create(
+            pond=pond,
+            reporter=reporter,
+            cycle=cycle,
+            recorded_at=make_aware(datetime.now()),
+            **payload.dict()
+        )
+        return fish_death_count
+
+@router.get("/{cycle_id}/{pond_id}/latest/", auth=JWTAuth(), response={200: FishDeathOutputSchema})
+def get_latest_fish_death(request, pond_id: str, cycle_id: str):
+    cycle = Cycle.objects.get(id=cycle_id)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+
+    check_cycle_active(cycle)
+
+    try:
+        fish_death = FishDeath.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
+    except ObjectDoesNotExist:
+        raise HttpError(404, DATA_NOT_FOUND)
+    return fish_death
