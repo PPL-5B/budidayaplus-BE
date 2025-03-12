@@ -1,13 +1,13 @@
 import uuid
+import json
 from django.test import TestCase
 from django.contrib.auth.models import User
 from ninja.testing import TestClient
 from fish_sampling.models import Pond, FishSampling, Cycle
 from fish_sampling.api import router
-import json
-from rest_framework_simplejwt.tokens import AccessToken
 from datetime import datetime, timedelta
 from django.utils.timezone import make_aware
+from rest_framework_simplejwt.tokens import AccessToken
 from user_profile.models import UserProfile, Worker
 from fish_sampling.api import determine_fish_status, target_data
 
@@ -15,11 +15,11 @@ class FishSamplingAPITest(TestCase):
     def setUp(self):
         self.client = TestClient(router)
 
-        # Buat Supervisor
+        # Supervisor
         self.supervisor = User.objects.create_user(username='supervisor', password='password', is_staff=True)
         self.supervisor_profile, _ = UserProfile.objects.get_or_create(user=self.supervisor)
 
-        # Buat Worker dengan Supervisor
+        # Worker dengan Supervisor
         self.user = User.objects.create_user(username='userA', password='abc123')
         self.worker = Worker.objects.create(user=self.user, assigned_supervisor=self.supervisor_profile)
 
@@ -49,7 +49,7 @@ class FishSamplingAPITest(TestCase):
             recorded_at=make_aware(datetime.now())
         )
 
-        # FIXED
+        # Token
         self.token = str(AccessToken.for_user(self.user))
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
@@ -68,7 +68,7 @@ class FishSamplingAPITest(TestCase):
         self.assertEqual(response.json()["fish_weight"], 2.0)
         self.assertEqual(response.json()["fish_length"], 30.0)
         self.assertTrue(response.json()["recorded_at"]) 
-
+    
     def test_add_fish_sampling_invalid_weight_length(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/',
@@ -96,7 +96,7 @@ class FishSamplingAPITest(TestCase):
     def test_create_fish_sampling_invalid_length(self):
         response = self.client.post(
             f'/{self.pond.pond_id}/{self.cycle.id}/',
-            data=json.dumps({'fish_weight': 5.0, 'fish_length': 110.0}),
+            data=json.dumps({'fish_weight': 5.0, 'fish_length': 110.1}),
             content_type="application/json",
             headers=self.headers
         )
@@ -177,6 +177,120 @@ class FishSamplingAPITest(TestCase):
         # Cek apakah cycle_id sesuai
         self.assertEqual(response.json()['cycle_id'], str(self.cycle.id))
 
+    def test_create_fish_sampling_negative_values(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': -2.0, 'fish_length': -30.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Berat dan panjang ikan harus lebih dari 0")
+
+    def test_create_fish_sampling_zero_values(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 0, 'fish_length': 0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Berat dan panjang ikan harus lebih dari 0")
+
+    def test_create_fish_sampling_non_active_cycle(self):
+        cycle = Cycle.objects.create(
+            supervisor=self.user,
+            start_date=datetime.now() - timedelta(days=100),
+            end_date=datetime.now() - timedelta(days=50)
+        )
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{cycle.id}/',
+            data=json.dumps({'fish_weight': 3.0, 'fish_length': 30.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Siklus tidak aktif")
+
+    def test_create_fish_sampling_duplicate_today_should_delete_old(self):
+        # Buat fish sampling pertama
+        response1 = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 1.8, 'fish_length': 28.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response1.status_code, 200)
+
+        # Buat fish sampling kedua hari yang sama, harus menghapus yang lama
+        response2 = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 2.5, 'fish_length': 35.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response2.status_code, 200)
+
+        # Cek apakah hanya satu fish sampling yang tersisa
+        self.assertEqual(FishSampling.objects.filter(pond=self.pond, cycle=self.cycle).count(), 1)
+
+    def test_supervisor_can_view_worker_data(self):
+        response = self.client.get(
+            f'/{self.pond.pond_id}/{self.cycle.id}/latest/',
+            headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.supervisor))}"}
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_fish_sampling_by_invalid_pond(self):
+        response = self.client.get(
+            f'/{uuid.uuid4()}/{self.cycle.id}/latest/',
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], 'Not Found')
+
+    def test_list_fish_samplings_empty_data(self):
+        FishSampling.objects.all().delete()
+        response = self.client.get(f'/{self.pond.pond_id}/', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['fish_samplings']), 0)
+    
+    def test_create_fish_sampling_max_valid_values(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 10.0, 'fish_length': 100.0}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 200)  # Harus diterima
+
+    def test_create_fish_sampling_above_max_invalid_values(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 10.1, 'fish_length': 100.1}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)  # Harus ditolak
+
+    def test_create_fish_sampling_invalid_weight_valid_length(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 10.1, 'fish_length': 99.9}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)  # Harus ditolak karena berat melebihi batas
+
+    def test_create_fish_sampling_valid_weight_invalid_length(self):
+        response = self.client.post(
+            f'/{self.pond.pond_id}/{self.cycle.id}/',
+            data=json.dumps({'fish_weight': 9.9, 'fish_length': 100.1}),
+            content_type="application/json",
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 400)  # Harus ditolak karena panjang melebihi batas
+
     def test_list_fish_samplings_by_pond_invalid_cycle(self):
         invalid_pond_id = uuid.uuid4() 
         response = self.client.get(f'/{invalid_pond_id}/', headers=self.headers)
@@ -225,4 +339,3 @@ class DetermineFishStatusTest(TestCase):
         """Pastikan jika week di luar 1-9, return invalid_week"""
         self.assertEqual(determine_fish_status(0, 5.5, 0.002), "invalid_week")
         self.assertEqual(determine_fish_status(10, 5.5, 0.002), "invalid_week")
-        
