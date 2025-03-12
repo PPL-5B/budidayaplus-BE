@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja_jwt.authentication import JWTAuth
@@ -6,7 +7,7 @@ from cycle.models import Cycle
 from cycle.services.cycle_service import CycleService
 from pond.models import Pond
 from pond_quality.models import PondQuality
-from pond_quality.schemas import PondQualityInput, PondQualityOutput, PondQualityHistory
+from pond_quality.schemas import PondQualityAlert, PondQualityInput, PondQualityOutput, PondQualityHistory, PondQualitySummary
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
@@ -36,7 +37,6 @@ def list_pond_quality(request, pond_id: str):
         "pond_qualities": pond_quality,
         "cycle_id": cycle.id
     }
-
 
 @router.post("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityInput):
@@ -84,9 +84,13 @@ def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str)
 
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
-    cycle = Cycle.objects.get(id=cycle_id)
+    cycle = get_object_or_404(Cycle, id=cycle_id)
     pond = get_object_or_404(Pond, pond_id=pond_id)
     supervisor = get_supervisor(user=request.auth)
+
+    # 🔹 Pindahkan validasi user sebelum mencoba mengambil data
+    if pond.owner != supervisor:
+        raise HttpError(401, UNAUTHORIZED_ACCESS)
 
     check_cycle_active(cycle)
 
@@ -95,10 +99,26 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
 
-    if (pond.owner != supervisor):
-        raise HttpError(401, UNAUTHORIZED_ACCESS)
-
     return pond_quality
+
+
+
+@router.get("/{pond_id}/summary", auth=JWTAuth(), response={200: PondQualitySummary})
+def get_pond_quality_summary(request, pond_id: str):
+   cycle = CycleService.get_active_cycle(request.auth)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+
+    check_cycle_active(cycle)
+
+    try:
+        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
+            "recorded_at", "ph_level", "salinity", "water_temperature"
+        ).latest("recorded_at")
+    except ObjectDoesNotExist:
+        raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
+
+    return PondQualitySummary(**pond_quality)
+
 
 @router.get("/{cycle_id}/{pond_id}/dashboard-table", auth=JWTAuth())
 def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
@@ -108,6 +128,56 @@ def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
     check_cycle_active(cycle)
 
     try:
+        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
+    except ObjectDoesNotExist:
+        raise HttpError(404, DATA_NOT_FOUND)
+
+    return {
+        "recorded_at": pond_quality.recorded_at,
+        "ph_level": pond_quality.ph_level,
+        "salinity": pond_quality.salinity,
+        "water_temperature": pond_quality.water_temperature,
+        "water_clarity": pond_quality.water_clarity
+    }
+
+@router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
+def get_pond_quality_alerts(request, pond_id: str):
+    cycle = CycleService.get_active_cycle(request.auth)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+
+    check_cycle_active(cycle)
+
+    try:
+        # Ambil hanya parameter yang diperlukan dari PondQuality
+        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
+            "ph_level", "salinity", "water_temperature", "recorded_at"
+        ).latest("recorded_at")
+    except ObjectDoesNotExist:
+        return []  # Jika tidak ada data, kembalikan list kosong
+
+    # Ambil target dari database atau hardcoded (sementara)
+    target_values = get_target_values_from_db(cycle)
+
+    alerts = []
+    for key, target in target_values.items():
+        actual = pond_quality.get(key, None)  # Ambil nilai parameter dari query
+        if actual is not None and actual < target:
+            alerts.append(PondQualityAlert(
+                parameter=key,
+                actual_value=actual,
+                target_value=target,
+                status="Below Target"
+            ))
+
+    return alerts
+
+def get_target_values_from_db(cycle):
+#Hardcoded Sementara
+    return {
+        "ph_level": 7.5,
+        "salinity": 30.0,
+        "water_temperature": 27.0,
+    }
         pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)

@@ -40,3 +40,17 @@ class PondQualityOutput(Schema):
 class PondQualityHistory(Schema):
     pond_qualities: List[PondQualityOutput]
     cycle_id: UUID4
+
+#Skema baru buat data tabel
+class PondQualitySummary(Schema):
+    recorded_at: datetime
+    ph_level: float
+    salinity: float
+    water_temperature: float
+
+class PondQualityAlert(Schema):
+    parameter: str
+    actual_value: float
+    target_value: float
+    status: str  # "Below Target" atau "Above Target"
+
