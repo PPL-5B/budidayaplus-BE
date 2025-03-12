@@ -284,40 +284,32 @@ class PondQualityAPITest(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_get_pond_quality_alerts_no_data(self):
-        #Jika tidak ada data, API akan mengembalikan response 200 dan pesan "Data belum tersedia"
-
-        PondQuality.objects.all().delete()  #Kosongkan database sebelum tes
+        # Jika tidak ada data, API akan mengembalikan response 200 dan pesan "Data belum tersedia"
+        PondQuality.objects.all().delete()  # Kosongkan database sebelum tes
 
         response = self.client.get(
             f'/{self.pond.pond_id}/alerts',
             headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
         )
 
-        self.assertEqual(response.status_code, 200)  
-        self.assertEqual(response.json(), [])  
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])  # Tidak ada data, maka response kosong
 
 
     def test_get_pond_quality_alerts_all_parameters_meet_target(self):
-        #Jika semua parameter dalam PondQualitySummary memenuhi target, API harus mengembalikan list kosong []
+        # Jika semua parameter dalam PondQualitySummary memenuhi target, API harus mengembalikan list kosong []
         PondQuality.objects.all().delete()  # Hapus semua data lama
 
         # Buat data PondQuality yang sesuai target
         PondQuality.objects.create(
-            pond = self.pond,
-            reporter = self.user,
-            cycle = self.cycle,
-            image_name = 'test.jpg',
-            ph_level = 8.0,
-            salinity = 30.0,
-            water_temperature = 27.0,
-            water_clarity = 0.0,
-            water_circulation = 0.0,
-            dissolved_oxygen = 0.0,
-            orp = 0.0,
-            ammonia = 0.0,
-            nitrate = 0.0,
-            phosphate = 0.0
-
+            pond=self.pond,
+            reporter=self.user,
+            cycle=self.cycle,
+            image_name='test.jpg',
+            ph_level=8.0,
+            salinity=30.0,
+            water_temperature=27.0,
+            water_clarity=0.0
         )
 
         response = self.client.get(
@@ -325,7 +317,8 @@ class PondQualityAPITest(TestCase):
             headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), [])  # Tidak boleh ada alert
+        self.assertEqual(response.json(), [])  # Tidak ada alert jika semua parameter sesuai target
+
 
     def test_get_pond_quality_alerts_some_parameters_below_target(self):
         # Jika ada parameter yang tidak memenuhi target, peringatan akan muncul
@@ -334,16 +327,10 @@ class PondQualityAPITest(TestCase):
             pond=self.pond,
             reporter=self.user,
             cycle=self.cycle,
-            ph_level=6.5,  # Di bawah target (7.5)
-            salinity=25.0,  # Di bawah target (30.0)
+            ph_level=6.5,  # Di bawah target (6.5 < 7.5)
+            salinity=25.0,  # Di bawah target (25.0 < 30.0)
             water_temperature=27.0,  # Sesuai target
-            water_clarity=5.0,
-            water_circulation=5.0,
-            dissolved_oxygen=8.0,
-            orp=200.0,
-            ammonia=0.1,
-            nitrate=5.0,
-            phosphate=1.0
+            water_clarity=5.0,  # Di atas target (5.0 > 0)
         )
 
         response = self.client.get(
@@ -362,13 +349,15 @@ class PondQualityAPITest(TestCase):
         for expected_alert in expected_alerts:
             self.assertIn(expected_alert, alerts)
 
+
     def test_get_pond_quality_alerts_invalid_token(self):
         # Token invalid --> harusnya muncul unauthorized
         response = self.client.get(
             f'/{self.pond.pond_id}/alerts',
             headers={"Authorization": "Bearer Invalid Token"}
         )
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 401)  # Unauthorized jika token salah
+
 
     def test_get_dashboard_table_data_positive(self):
         with patch('pond_quality.api.get_supervisor', return_value=self.user):
