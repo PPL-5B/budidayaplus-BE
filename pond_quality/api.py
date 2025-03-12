@@ -102,10 +102,8 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
 
     return pond_quality
 
-
-
 def fetch_dashboard_table_data(cycle, pond):
-    #Helper function untuk mengambil data dashboard
+    #Helper function untuk mengambil data dashboar
     try:
         pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
     except ObjectDoesNotExist:
@@ -141,7 +139,6 @@ def get_pond_quality_alerts(request, pond_id: str):
 
     # Validasi data terhadap threshold
     _status, violations, _states = validate_pond_quality_against_threshold(dashboard_data)
-
     # Jika ada violations, buatkan alert untuk setiap pelanggaran
     alerts = [
         PondQualityAlert(
@@ -153,7 +150,6 @@ def get_pond_quality_alerts(request, pond_id: str):
     ]
 
     return alerts
-
 
 def authorize_user(self, user, pond: Pond):
     supervisor = get_supervisor(user)
