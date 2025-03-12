@@ -4,7 +4,7 @@ from datetime import date
 
 class FilterRepo:
     @staticmethod
-    def filter_tasks(cycle_id: str, period: str|None = None, assignee_username: str|None = None):
+    def filter_tasks(cycle_id: str, period: str = None, assignee_username: str = None):
         filters = {}
         today = now().date()
 
