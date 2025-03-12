@@ -105,7 +105,7 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
 
 @router.get("/{pond_id}/summary", auth=JWTAuth(), response={200: PondQualitySummary})
 def get_pond_quality_summary(request, pond_id: str):
-   cycle = CycleService.get_active_cycle(request.auth)
+    cycle = CycleService.get_active_cycle(request.auth)
     pond = get_object_or_404(Pond, pond_id=pond_id)
 
     check_cycle_active(cycle)
@@ -178,18 +178,6 @@ def get_target_values_from_db(cycle):
         "salinity": 30.0,
         "water_temperature": 27.0,
     }
-        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
-    except ObjectDoesNotExist:
-        raise HttpError(404, DATA_NOT_FOUND)
-
-    return {
-        "recorded_at": pond_quality.recorded_at,
-        "ph_level": pond_quality.ph_level,
-        "salinity": pond_quality.salinity,
-        "water_temperature": pond_quality.water_temperature,
-        "water_clarity": pond_quality.water_clarity
-    }
-
 
 def authorize_user(self, user, pond: Pond):
     supervisor = get_supervisor(user)
