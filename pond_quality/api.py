@@ -103,30 +103,8 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
 
 
 
-@router.get("/{pond_id}/summary", auth=JWTAuth(), response={200: PondQualitySummary})
-def get_pond_quality_summary(request, pond_id: str):
-   cycle = CycleService.get_active_cycle(request.auth)
-    pond = get_object_or_404(Pond, pond_id=pond_id)
-
-    check_cycle_active(cycle)
-
-    try:
-        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
-            "recorded_at", "ph_level", "salinity", "water_temperature"
-        ).latest("recorded_at")
-    except ObjectDoesNotExist:
-        raise HttpError(404, "Data belum tersedia, silakan isi data terlebih dahulu.")
-
-    return PondQualitySummary(**pond_quality)
-
-
-@router.get("/{cycle_id}/{pond_id}/dashboard-table", auth=JWTAuth())
-def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
-    cycle = Cycle.objects.get(id=cycle_id)
-    pond = get_object_or_404(Pond, pond_id=pond_id)
-
-    check_cycle_active(cycle)
-
+def fetch_dashboard_table_data(cycle, pond):
+    #Helper function untuk mengambil data dashboard
     try:
         pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
     except ObjectDoesNotExist:
@@ -140,6 +118,16 @@ def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
         "water_clarity": pond_quality.water_clarity
     }
 
+@router.get("/{cycle_id}/{pond_id}/dashboard-table", auth=JWTAuth())
+def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
+    cycle = Cycle.objects.get(id=cycle_id)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+    
+    check_cycle_active(cycle)
+
+    return fetch_dashboard_table_data(cycle, pond)
+
+
 @router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
 def get_pond_quality_alerts(request, pond_id: str):
     cycle = CycleService.get_active_cycle(request.auth)
@@ -150,7 +138,7 @@ def get_pond_quality_alerts(request, pond_id: str):
     try:
         # Ambil hanya parameter yang diperlukan dari PondQuality
         pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
-            "ph_level", "salinity", "water_temperature", "recorded_at"
+            "ph_level", "salinity", "water_temperature", "water_clarity", "recorded_at"
         ).latest("recorded_at")
     except ObjectDoesNotExist:
         return []  # Jika tidak ada data, kembalikan list kosong
@@ -170,25 +158,6 @@ def get_pond_quality_alerts(request, pond_id: str):
             ))
 
     return alerts
-
-def get_target_values_from_db(cycle):
-#Hardcoded Sementara
-    return {
-        "ph_level": 7.5,
-        "salinity": 30.0,
-        "water_temperature": 27.0,
-    }
-        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
-    except ObjectDoesNotExist:
-        raise HttpError(404, DATA_NOT_FOUND)
-
-    return {
-        "recorded_at": pond_quality.recorded_at,
-        "ph_level": pond_quality.ph_level,
-        "salinity": pond_quality.salinity,
-        "water_temperature": pond_quality.water_temperature,
-        "water_clarity": pond_quality.water_clarity
-    }
 
 
 def authorize_user(self, user, pond: Pond):
