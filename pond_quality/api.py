@@ -12,6 +12,7 @@ from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
 from user_profile.utils import get_supervisor
+from threshold.utils import validate_pond_quality_against_threshold
 
 DATA_NOT_FOUND = "Data tidak ditemukan"
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
@@ -127,35 +128,29 @@ def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
 
     return fetch_dashboard_table_data(cycle, pond)
 
-
 @router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
 def get_pond_quality_alerts(request, pond_id: str):
-    cycle = CycleService.get_active_cycle(request.auth)
-    pond = get_object_or_404(Pond, pond_id=pond_id)
+    user = request.auth
+    cycle = Cycle.objects.get(user=user, active=True)  # Ambil siklus aktif berdasarkan pengguna
 
+    # Pastikan siklus aktif untuk pengguna
     check_cycle_active(cycle)
 
-    try:
-        # Ambil hanya parameter yang diperlukan dari PondQuality
-        pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond).values(
-            "ph_level", "salinity", "water_temperature", "water_clarity", "recorded_at"
-        ).latest("recorded_at")
-    except ObjectDoesNotExist:
-        return []  # Jika tidak ada data, kembalikan list kosong
+    # Ambil data dashboard (4 parameter)
+    dashboard_data = get_dashboard_table_data(request, cycle.id, pond_id)
 
-    # Ambil target dari database atau hardcoded (sementara)
-    target_values = get_target_values_from_db(cycle)
+    # Validasi data terhadap threshold
+    _status, violations, _states = validate_pond_quality_against_threshold(dashboard_data)
 
-    alerts = []
-    for key, target in target_values.items():
-        actual = pond_quality.get(key, None)  # Ambil nilai parameter dari query
-        if actual is not None and actual < target:
-            alerts.append(PondQualityAlert(
-                parameter=key,
-                actual_value=actual,
-                target_value=target,
-                status="Below Target"
-            ))
+    # Jika ada violations, buatkan alert untuk setiap pelanggaran
+    alerts = [
+        PondQualityAlert(
+            parameter=violation["parameter"],
+            actual_value=violation["actual_value"],
+            target_value=violation["target_value"],
+            status=violation["status"]
+        ) for violation in violations
+    ]
 
     return alerts
 
