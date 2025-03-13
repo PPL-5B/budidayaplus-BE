@@ -37,7 +37,7 @@ ALLOWED_HOSTS = [
     # "https://dkn-budidayaplus.vercel.app",
     # "https://dkn-budidayaplus-staging.vercel.app",
     "https://budidayaplus-fe-gray.vercel.app",
-    "https://budidayaplus-fe-alpha.vercel.app/auth/login"
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 
