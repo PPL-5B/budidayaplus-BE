@@ -34,8 +34,10 @@ ALLOWED_HOSTS = [
     '103.177.95.189', 
     'localhost',
     '127.0.0.1',
-    "https://dkn-budidayaplus.vercel.app",
-    "https://dkn-budidayaplus-staging.vercel.app"
+    # "https://dkn-budidayaplus.vercel.app",
+    # "https://dkn-budidayaplus-staging.vercel.app",
+    "https://budidayaplus-fe-gray.vercel.app",
+    "https://budidayaplus-fe-alpha.vercel.app/auth/login"
 ]
 
 
