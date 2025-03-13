@@ -35,7 +35,8 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     "https://dkn-budidayaplus.vercel.app",
-    "https://dkn-budidayaplus-staging.vercel.app"
+    "https://dkn-budidayaplus-staging.vercel.app",
+    "https://budidayaplus-fe-gray.vercel.app"
 ]
 
 
@@ -176,12 +177,8 @@ load_dotenv()
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get("DB_NAME"),
-        'USER': os.environ.get("DB_USER"),
-        'PASSWORD': os.environ.get("DB_PASS"),
-        'HOST': os.environ.get("DB_HOST"),
-        'PORT': os.environ.get("DB_PORT"),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
