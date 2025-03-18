@@ -126,7 +126,7 @@ def reporting_fish_death(request, pond_id: str, cycle_id: str, payload: FishDeat
     if payload.count < 0 :
         raise HttpError(400, "Jumlah kematian minimal 0")
     elif pond.owner != supervisor:
-        raise HttpError(404, "Data tidak ditemukan")
+        raise HttpError(400, "Data tidak ditemukan")
     else:
         fish_death_count = FishDeath.objects.create(
             pond=pond,
