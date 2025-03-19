@@ -4,19 +4,20 @@ from pydantic import UUID4
 from typing import List
 from user_profile.schemas import UserSchema
 
-class FoodSamplingCreateSchema(Schema):
-    food_quantity: int
+class FishDeathCreateSchema(Schema):
+    fish_death_count: int
+    fish_alive_count: int
     recorded_at: datetime
 
-class FoodSamplingOutputSchema(Schema):
-    sampling_id: UUID4
+class FishDeathOutputSchema(Schema):
+    id: UUID4
     pond_id: UUID4
     cycle_id: UUID4
     reporter: UserSchema
-    food_quantity: float
     recorded_at: datetime
-    target_food_quantity: float
+    fish_death_count: int
+    fish_alive_count: int
 
-class FoodSamplingList(Schema):
-    food_samplings: List[FoodSamplingOutputSchema]
+class FishDeathList(Schema):
+    fish_deaths: List[FishDeathOutputSchema]
     cycle_id: UUID4

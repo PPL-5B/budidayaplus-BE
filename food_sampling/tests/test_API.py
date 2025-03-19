@@ -12,6 +12,9 @@ from food_sampling.api import router
 from ninja.errors import HttpError
 
 class FoodSamplingAPITest(TestCase):
+    DATA_NOT_FOUND = "Data tidak ditemukan"
+    CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
+    UNAUTHORIZED_ACCESS = "Anda tidak memiliki akses untuk melihat data ini"
 
     def setUp(self):
         date_now = datetime.now()
@@ -57,19 +60,34 @@ class FoodSamplingAPITest(TestCase):
         )
     
     def test_get_food_sampling(self):
-        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 200)
+        token = str(AccessToken.for_user(self.user))
+        
+        # Mock the get_supervisor function to return the user itself to ensure authorization works
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
+            response = self.client.get(
+                f'/{self.cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/',
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertEqual(data['sampling_id'], str(self.food_sampling.sampling_id))
+            self.assertEqual(data['pond_id'], str(self.pond.pond_id))
+            self.assertEqual(data['cycle_id'], str(self.cycle.id))
     
     def test_get_food_sampling_cycle_not_active(self): 
-        start_date = datetime.now()
-        end_date = start_date + timedelta(days=60)
-        cycle = Cycle.objects.create(
-            supervisor=self.user,
-            start_date=start_date,
-            end_date=end_date
-        )
-        response = self.client.get(f'/{cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 404)
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
+            start_date = datetime.now()
+            end_date = start_date + timedelta(days=60)
+            cycle = Cycle.objects.create(
+                supervisor=self.user,
+                start_date=start_date,
+                end_date=end_date
+            )
+            response = self.client.get(
+                f'/{cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/', 
+                headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+            self.assertEqual(response.status_code, 404)
     
     def test_get_food_sampling_different_cycle(self):
         starting_date = datetime.now()
@@ -83,8 +101,9 @@ class FoodSamplingAPITest(TestCase):
         self.assertEqual(response.status_code, 404)
     
     def test_get_food_sampling_invalid_pond(self):
-        response = self.client.get(f'/{self.cycle.id}/{uuid.uuid4()}/{self.food_sampling.sampling_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 500)
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
+            response = self.client.get(f'/{self.cycle.id}/{uuid.uuid4()}/{self.food_sampling.sampling_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+            self.assertEqual(response.status_code, 500)
     
     def test_get_food_sampling_different_pond(self):
         response = self.client.get(f'/{self.cycle.id}/{self.pondB.pond_id}/{self.food_sampling.sampling_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
@@ -96,29 +115,38 @@ class FoodSamplingAPITest(TestCase):
     
     def test_get_food_sampling_invalid_user(self):
         user = User.objects.create_user(username='081234567891', password='admin1234')
-        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(user))}"})
-        self.assertEqual(response.status_code, 401)
+        
+        # Mock get_supervisor to return the new user (not the pond owner) to trigger the authorization error properly
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=user):
+            response = self.client.get(
+                f'/{self.cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/', 
+                headers={"Authorization": f"Bearer {str(AccessToken.for_user(user))}"}
+            )
+            self.assertEqual(response.status_code, 401)
     
     def test_list_food_samplings(self):
-        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()['food_samplings']), 2)
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
+            response = self.client.get(f'/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(response.json()['food_samplings']), 2)
 
     def test_list_food_sampling_unauthorized(self):
-        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/{self.food_sampling.sampling_id}/', headers={})
+        response = self.client.get(f'/{self.pond.pond_id}/', headers={})
         self.assertEqual(response.status_code, 401)
     
-    def test_list_food_sampling_by_invalid_cycle(self):
-        response = self.client.get(f'{uuid.uuid4()}/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 500)
+    # def test_list_food_sampling_by_invalid_cycle(self):
+    #     response = self.client.get(f'{uuid.uuid4()}/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+    #     self.assertEqual(response.status_code, 500)
     
     def test_list_food_sampling_by_invalid_pond(self):
-        response = self.client.get(f'/{self.cycle.id}/{uuid.uuid4()}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 500)
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
+            response = self.client.get(f'/{uuid.uuid4()}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+            self.assertEqual(response.status_code, 404)
     
     def test_get_latest_food_sampling(self):
-        response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 200)
+        with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
+            response = self.client.get(f'/{self.cycle.id}/{self.pond.pond_id}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
+            self.assertEqual(response.status_code, 200)
     
     def test_get_latest_food_sampling_invalid_pond(self):
         response = self.client.get(f'/{self.cycle.id}/{uuid.uuid4()}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
@@ -138,8 +166,8 @@ class FoodSamplingAPITest(TestCase):
             end_date=end_date
         )
         response = self.client.get(f'/{cycle.id}/{self.pond.pond_id}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-        self.assertEqual(response.status_code, 500)
-    
+        self.assertEqual(response.status_code, 400)
+        
     def test_get_latest_food_sampling_not_found(self):
         response = self.client.get(f'/{self.cycle.id}/{self.pondB.pond_id}/latest', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
         self.assertEqual(response.status_code, 404)
@@ -221,9 +249,21 @@ class FoodSamplingAPITest(TestCase):
         mock_list_food_samplings.side_effect = HttpError(403, "Mocked authorization error")
 
         response = self.client.get(
-            f'/{self.cycle.id}/{self.pond.pond_id}/',
+            f'/{self.pond.pond_id}/',
             headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
         )
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()['detail'], "Mocked authorization error")
+
+    @patch('food_sampling.api.food_sampling_service.list_food_samplings')
+    def test_list_food_samplings_with_unexpected_error(self, mock_list_food_samplings):
+        mock_list_food_samplings.side_effect = Exception("Mocked exception error")
+        
+        response = self.client.get(
+            f'/{self.pond.pond_id}/',
+            headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"}
+        )
+        
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()['detail'], "An unexpected error occurred")
