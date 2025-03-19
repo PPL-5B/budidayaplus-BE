@@ -8,8 +8,6 @@ from fish_death.schemas import FishDeathCreateSchema, FishDeathOutputSchema, Fis
 from datetime import datetime, timedelta
 from pydantic import ValidationError
 
-from user_profile.schemas import UserSchema
-
 class FishDeathSchemaTest(TestCase):
    
     def setUp(self):
