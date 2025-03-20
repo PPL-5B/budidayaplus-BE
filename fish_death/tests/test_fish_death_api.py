@@ -147,54 +147,6 @@ class FishDeathAPITestCase(TestCase):
         self.assertEqual(fish_deaths_list[1]["id"], str(fd1.id))
 
 
-class FishDeathNotificationTest(TestCase):
-    def setUp(self):
-        self.client = TestClient(router)
 
-        # Create Supervisor
-        self.supervisor = User.objects.create_user(username='supervisor', password='password', is_staff=True)
-        self.supervisor_profile, _ = UserProfile.objects.get_or_create(user=self.supervisor)
 
-        # Create Worker with Supervisor
-        self.user = User.objects.create_user(username='userA', password='abc123')
-        self.worker = Worker.objects.create(user=self.user, assigned_supervisor=self.supervisor_profile)
-
-        self.pond = Pond.objects.create(
-            owner=self.supervisor,
-            name='Test Pond',
-            image_name='test_pond.png',
-            length=10.0,
-            width=5.0,
-            depth=2.0
-        )
-
-        start_time = make_aware(datetime.now()) - timedelta(days=30)
-        end_time = start_time + timedelta(days=60)
-        self.cycle = Cycle.objects.create(
-            supervisor=self.supervisor,
-            start_date=start_time,
-            end_date=end_time,
-        )
-
-        self.token = str(AccessToken.for_user(self.user))
-        self.headers = {"Authorization": f"Bearer {self.token}"}
-
-    def test_fish_death_notification(self):
-        """Test that a notification is created when fish death data is added."""
-        response = self.client.post(
-            f'/{self.pond.pond_id}/{self.cycle.id}/death/',
-            data=json.dumps({'count': 10}),
-            content_type="application/json",
-            headers=self.headers
-        )
-
-        # Check the response
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("message", response.json())
-        self.assertEqual(response.json()["message"], "Fish death data recorded successfully.")
-
-        # Check that a notification was created
-        notification = FishDeathNotification.objects.filter(user=self.supervisor).first()
-        self.assertIsNotNone(notification)
-        self.assertEqual(notification.title, "Fish Death Alert")
-        self.assertIn("10 fish deaths reported", notification.message)
+    

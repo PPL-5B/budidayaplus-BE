@@ -21,3 +21,13 @@ class FishDeathOutputSchema(Schema):
 class FishDeathList(Schema):
     fish_deaths: List[FishDeathOutputSchema]
     cycle_id: UUID4
+
+class FishDeathNotification(Schema):
+    id: UUID4
+    pond_id: UUID4
+    cycle_id: UUID4
+    reporter: UserSchema
+    recorded_at: datetime
+    fish_death_count: int
+    fish_alive_count: int
+    message : str
