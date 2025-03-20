@@ -3,31 +3,44 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
 from ninja_jwt.tokens import AccessToken
+from ninja.testing import TestClient
+from fish_death.api import router
 from datetime import timedelta
 from django.utils import timezone
+from django.utils.timezone import make_aware
 from pond.models import Pond
 from cycle.models import Cycle, PondFishAmount
+from user_profile.models import UserProfile, Worker
 from fish_death.models import FishDeath
+from datetime import datetime, timedelta
 
 class FishDeathAPITestCase(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser",
-            password="testpass"
-        )
-        self.token = str(AccessToken.for_user(self.user))
+        self.client = TestClient(router)
+
+        # Buat Supervisor
+        self.supervisor = User.objects.create_user(username='supervisor', password='password', is_staff=True)
+        self.supervisor_profile, _ = UserProfile.objects.get_or_create(user=self.supervisor)
+
+        # Buat Worker dengan Supervisor
+        self.user = User.objects.create_user(username='userA', password='abc123')
+        self.worker = Worker.objects.create(user=self.user, assigned_supervisor=self.supervisor_profile)
 
         self.pond = Pond.objects.create(
-            pond_id="test-pond-id",
-            name="Test Pond"
+            owner=self.supervisor,
+            name='Test Pond',
+            image_name='test_pond.png',
+            length=10.0,
+            width=5.0,
+            depth=2.0
         )
 
-        now = timezone.now()
+        start_time = make_aware(datetime.now()) - timedelta(days=30)
+        end_time = start_time + timedelta(days=60)
         self.cycle = Cycle.objects.create(
-            start_date=now.date(),
-            end_date=(now + timedelta(days=10)).date(),
-            supervisor=self.user,
-            is_stopped=False
+            supervisor=self.supervisor,
+            start_date=start_time,
+            end_date=end_time,
         )
 
         self.pond_fish_amount = PondFishAmount.objects.create(
@@ -36,7 +49,9 @@ class FishDeathAPITestCase(TestCase):
             fish_amount=100
         )
 
-        self.client = self.client_class()
+        # FIXED
+        self.token = str(AccessToken.for_user(self.user))
+        self.headers = {"Authorization": f"Bearer {self.token}"}
 
     def test_create_fish_death(self):
         """
