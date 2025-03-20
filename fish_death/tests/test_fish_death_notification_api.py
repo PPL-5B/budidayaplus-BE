@@ -13,8 +13,7 @@ from fish_death.models import FishDeathNotification
 class FishDeathNotificationAPITestCase(TestCase):
     
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.supervisor = User.objects.create_user(username="supervisor", password="supervisorpass", is_staff=True)
+        self.user = User.objects.create_user(username="081234567890", password="password")
         self.token = str(AccessToken.for_user(self.user))
 
         self.pond = Pond.objects.create(
