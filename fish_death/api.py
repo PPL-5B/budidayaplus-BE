@@ -1,7 +1,16 @@
 from fish_death.models import FishDeath, FishDeathNotification
+from fish_death.schemas import FishDeathOutputSchema, FishDeathNotification, FishDeathCreateSchem, FishDeathList
+from pond.models import Pond, PondFishAmount
+from cycle.models import Cycle
+from ninja import Router, Schema
+from ninja.errors import HttpError
+from ninja.responses import JsonResponse
+from ninja_jwt import JWTAuth
+from django.utils import timezone
+from typing import List, Optional
 
-@router.post("/{pond_id}/{cycle_id}/death/")
-def add_fish_death(request, pond_id: str, cycle_id: str, data: dict):
+@router.post("/{pond_id}/{cycle_id}/death/", auth=JWTAuth(), response={200: FishDeathNotification})
+def add_fish_death_notification(request, pond_id: str, cycle_id: str, payload: FishDeathNotification):
     # Validate and process the request
     pond = Pond.objects.filter(pond_id=pond_id).first()
     cycle = Cycle.objects.filter(id=cycle_id).first()
