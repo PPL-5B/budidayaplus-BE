@@ -9,7 +9,10 @@ from ninja_jwt import JWTAuth
 from django.utils import timezone
 from typing import List, Optional
 
-@router.post("/{pond_id}/{cycle_id}/death/", auth=JWTAuth(), response={200: FishDeathNotification})
+router = Router()
+
+#@router.post("/{pond_id}/{cycle_id}/death/", auth=JWTAuth(), response={200: FishDeathNotification})
+@router.post("/{pond_id}/{cycle_id}/death/", auth=JWTAuth())
 def add_fish_death_notification(request, pond_id: str, cycle_id: str, payload: FishDeathNotification):
     # Validate and process the request
     pond = Pond.objects.filter(pond_id=pond_id).first()
@@ -21,7 +24,7 @@ def add_fish_death_notification(request, pond_id: str, cycle_id: str, payload: F
     if not cycle.is_active:
         return JsonResponse({"error": "Cycle is not active."}, status=400)
 
-    fish_death_count = data.get("fish_death_count", 0)
+    fish_death_count = payload.get("fish_death_count", 0)
     if fish_death_count <= 0:
         return JsonResponse({"error": "Fish death count must be greater than 0."}, status=400)
 
