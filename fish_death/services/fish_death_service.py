@@ -13,8 +13,6 @@ class FishDeathService:
     INVALID_FISH_DEATH_COUNT = "Input jumlah kematian ikan tidak valid"
     UNAUTHORIZED_ACCESS = "Anda tidak memiliki akses untuk melihat data ini"
 
-    fish_death_target = {i: {'fish_death_count': i} for i in range(0, 101)} 
-
     def __init__(self, repository: FishDeathRepository):
         self.repository = repository
 
@@ -25,7 +23,6 @@ class FishDeathService:
 
     def authorize_user(self, user, pond: Pond):
         supervisor = get_supervisor(user)
-
         if pond.owner != supervisor:
             raise HttpError(401, self.UNAUTHORIZED_ACCESS)
 
@@ -39,8 +36,6 @@ class FishDeathService:
             raise HttpError(404, self.DATA_NOT_FOUND)
 
         self.authorize_user(user, pond)
-        target_fish_death_count = self.fish_death_target.get(1, {}).get('fish_death_count', 0)
-        fish_death.target_fish_death_count = target_fish_death_count
         return fish_death
 
     def get_latest_fish_death(self, cycle_id: str, pond_id: str, user) -> FishDeath:
@@ -52,13 +47,7 @@ class FishDeathService:
         if fish_death is None:
             raise HttpError(404, self.DATA_NOT_FOUND)
 
-        try:
-            self.authorize_user(user, pond)
-        except:
-            raise HttpError(401, self.UNAUTHORIZED_ACCESS)
-
-        target_fish_death_count = self.fish_death_target.get(1, {}).get('fish_death_count', 0)
-        fish_death.target_fish_death_count = target_fish_death_count
+        self.authorize_user(user, pond)
         return fish_death
 
     def list_fish_deaths(self, pond_id: str, user):
@@ -75,11 +64,6 @@ class FishDeathService:
             raise HttpError(404, "Cycle not active")
 
         fish_deaths = self.repository.list_fish_deaths(cycle, pond)
-
-        for index, fish_death in enumerate(fish_deaths, 1):
-            target_fish_death_count = self.fish_death_target.get(index, self.fish_death_target.get(1, {})).get('fish_death_count', 0)
-            fish_death.target_fish_death_count = target_fish_death_count
-
         return {
             'fish_deaths': fish_deaths,
             'cycle_id': cycle.id
@@ -106,8 +90,5 @@ class FishDeathService:
             )
         except ValueError:
             raise HttpError(400, self.INVALID_FISH_DEATH_COUNT)
-
-        target_fish_death_count = self.fish_death_target.get(1, {}).get('fish_death_count', 0)
-        fish_death.target_fish_death_count = target_fish_death_count
 
         return fish_death
