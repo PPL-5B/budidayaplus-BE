@@ -35,7 +35,8 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     "https://dkn-budidayaplus.vercel.app",
-    "https://dkn-budidayaplus-staging.vercel.app"
+    "https://dkn-budidayaplus-staging.vercel.app",
+    "https://budidayaplus-fe-gray.vercel.app"
 ]
 
 
@@ -58,6 +59,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'tasks',
     'threshold',
+    'fish_death',
 ]
 
 NINJA_JWT = {
@@ -177,10 +179,9 @@ load_dotenv()
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',  # or a string path
     }
 }
-
 
 
 

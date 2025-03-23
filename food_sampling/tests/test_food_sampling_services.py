@@ -131,7 +131,7 @@ class FoodSamplingServiceTest(TestCase):
                 
                 self.mock_repository.get_pond.assert_called_once_with('pond_id')
                 self.mock_repository.list_food_samplings.assert_called_once_with(self.mock_cycle, self.mock_pond)
-                
+
                 expected_result = {
                     'food_samplings': [self.mock_food_sampling],
                     'cycle_id': self.mock_cycle.id
@@ -142,7 +142,7 @@ class FoodSamplingServiceTest(TestCase):
         self.mock_cycle.start_date = datetime.now().date() - timedelta(days=30)
         self.mock_cycle.end_date = datetime.now().date() + timedelta(days=30)
         self.mock_cycle.supervisor = MagicMock()
-        
+
         with patch('food_sampling.services.food_sampling_service.CycleRepo.get_active_cycle') as mock_get_active_cycle:
             mock_get_active_cycle.return_value = self.mock_cycle
             

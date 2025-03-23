@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja_jwt.authentication import JWTAuth
@@ -6,11 +7,12 @@ from cycle.models import Cycle
 from cycle.services.cycle_service import CycleService
 from pond.models import Pond
 from pond_quality.models import PondQuality
-from pond_quality.schemas import PondQualityInput, PondQualityOutput, PondQualityHistory
+from pond_quality.schemas import PondQualityAlert, PondQualityInput, PondQualityOutput, PondQualityHistory, PondQualitySummary
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
 from user_profile.utils import get_supervisor
+from threshold.utils import validate_pond_quality_against_threshold
 
 DATA_NOT_FOUND = "Data tidak ditemukan"
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
@@ -36,7 +38,6 @@ def list_pond_quality(request, pond_id: str):
         "pond_qualities": pond_quality,
         "cycle_id": cycle.id
     }
-
 
 @router.post("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityInput):
@@ -84,9 +85,13 @@ def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str)
 
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
-    cycle = Cycle.objects.get(id=cycle_id)
+    cycle = get_object_or_404(Cycle, id=cycle_id)
     pond = get_object_or_404(Pond, pond_id=pond_id)
     supervisor = get_supervisor(user=request.auth)
+
+    # 🔹 Pindahkan validasi user sebelum mencoba mengambil data
+    if pond.owner != supervisor:
+        raise HttpError(401, UNAUTHORIZED_ACCESS)
 
     check_cycle_active(cycle)
 
@@ -95,7 +100,58 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
 
-    if (pond.owner != supervisor):
-        raise HttpError(401, UNAUTHORIZED_ACCESS)
-
     return pond_quality
+
+def fetch_dashboard_table_data(cycle, pond):
+    #Helper function untuk mengambil data dashboar
+    try:
+        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
+    except ObjectDoesNotExist:
+        raise HttpError(404, DATA_NOT_FOUND)
+
+    return {
+        "recorded_at": pond_quality.recorded_at,
+        "ph_level": pond_quality.ph_level,
+        "salinity": pond_quality.salinity,
+        "water_temperature": pond_quality.water_temperature,
+        "water_clarity": pond_quality.water_clarity
+    }
+
+@router.get("/{cycle_id}/{pond_id}/dashboard-table", auth=JWTAuth())
+def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
+    cycle = Cycle.objects.get(id=cycle_id)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+    
+    check_cycle_active(cycle)
+
+    return fetch_dashboard_table_data(cycle, pond)
+
+@router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
+def get_pond_quality_alerts(request, pond_id: str):
+    user = request.auth
+    cycle = Cycle.objects.get(user=user, active=True)  # Ambil siklus aktif berdasarkan pengguna
+
+    # Pastikan siklus aktif untuk pengguna
+    check_cycle_active(cycle)
+
+    # Ambil data dashboard (4 parameter)
+    dashboard_data = get_dashboard_table_data(request, cycle.id, pond_id)
+
+    # Validasi data terhadap threshold
+    _status, violations, _states = validate_pond_quality_against_threshold(dashboard_data)
+    # Jika ada violations, buatkan alert untuk setiap pelanggaran
+    alerts = [
+        PondQualityAlert(
+            parameter=violation["parameter"],
+            actual_value=violation["actual_value"],
+            target_value=violation["target_value"],
+            status=violation["status"]
+        ) for violation in violations
+    ]
+
+    return alerts
+
+def authorize_user(self, user, pond: Pond):
+    supervisor = get_supervisor(user)
+    if pond.owner != supervisor:
+        raise HttpError(401, self.UNAUTHORIZED_ACCESS)
