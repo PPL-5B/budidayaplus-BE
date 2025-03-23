@@ -113,6 +113,5 @@ class FoodSamplingService:
 
         target_food_quantity = self.food_sampling_target.get(1, {}).get('food_quantity', 0)
         food_sampling.target_food_quantity = target_food_quantity
-
+        
         return food_sampling
-
