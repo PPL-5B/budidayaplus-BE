@@ -125,5 +125,4 @@ jobs:
           -Dsonar.python.version=3.12
           -Dsonar.sources=.
           -Dsonar.python.coverage.reportPaths=coverage.xml
-          -Dsonar.exclusions=**/migrations/**,
           -Dsonar.coverage.exclusions=**/tests/**,**/migrations/**,**/__init__.py,**/admin.py,**/apps.py
