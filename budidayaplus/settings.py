@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'tasks',
     'threshold',
+    'fish_death',
 ]
 
 NINJA_JWT = {
