@@ -38,3 +38,9 @@ class ForumRepositoryTest(TestCase):
         self.assertEqual(len(forums), 1)
         with self.assertRaises(Http404):
             ForumRepository.get_forum_by_id(self.forum1.id)
+            
+    def test_get_latest_forum_returns_none_when_no_forum(self):
+        Forum.objects.all().delete()
+        
+        latest_forum = ForumRepository.get_latest_forum()
+        self.assertIsNone(latest_forum)
