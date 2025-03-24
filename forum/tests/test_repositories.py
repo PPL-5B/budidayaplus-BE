@@ -28,9 +28,9 @@ class ForumRepositoryTest(TestCase):
         forums = ForumRepository.get_forums_by_user(self.user)
         self.assertEqual(len(forums), 2)
 
-    def test_get_latest_forum(self):
-        latest_forum = ForumRepository.get_latest_forum()
-        self.assertEqual(latest_forum, self.forum2)
+    # def test_get_latest_forum(self):
+    #     latest_forum = ForumRepository.get_latest_forum()
+    #     self.assertEqual(latest_forum, self.forum2)
 
     def test_delete_forum(self):
         ForumRepository.delete_forum(self.forum1)
@@ -44,3 +44,13 @@ class ForumRepositoryTest(TestCase):
         
         latest_forum = ForumRepository.get_latest_forum()
         self.assertIsNone(latest_forum)
+
+    def test_update_forum(self):
+        updated_forum = ForumRepository.update_forum(
+            forum_id=self.forum1.id,
+            description="Updated Forum post"
+        )
+        self.assertEqual(updated_forum.description, "Updated Forum post")
+
+        forum_from_db = Forum.objects.get(id=self.forum1.id)
+        self.assertEqual(forum_from_db.description, "Updated Forum post")

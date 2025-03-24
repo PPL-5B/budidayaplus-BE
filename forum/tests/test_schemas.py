@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum
-from forum.schemas import ForumCreateSchema, ForumOutputSchema
+from forum.schemas import ForumCreateSchema, ForumOutputSchema, ForumUpdateSchema
 
 class ForumSchemaTest(TestCase):
     def setUp(self):
@@ -41,3 +41,11 @@ class ForumSchemaTest(TestCase):
         self.assertEqual(schema_instance.description, forum.description)
         self.assertEqual(schema_instance.id, forum.id)
         self.assertEqual(schema_instance.timestamp, forum.timestamp)
+
+    def test_forum_update_schema(self):
+        data = {
+            "description": "Updated forum description"
+        }
+        schema_instance = ForumUpdateSchema(**data)
+        
+        self.assertEqual(schema_instance.description, data["description"])

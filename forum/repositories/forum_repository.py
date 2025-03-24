@@ -35,4 +35,3 @@ class ForumRepository:
             return Forum.objects.latest('timestamp')
         except ObjectDoesNotExist:
             return None
-
