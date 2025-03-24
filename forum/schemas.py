@@ -30,3 +30,9 @@ class ForumListSchema(Schema):
     Schema for listing multiple Forum entries.
     """
     forums: List[ForumOutputSchema]
+
+class ForumUpdateSchema(Schema):
+    """
+    Schema for updating an existing Forum entry.
+    """
+    description: str
