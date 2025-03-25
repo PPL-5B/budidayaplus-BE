@@ -1,3 +1,4 @@
+from uuid import uuid4
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum
@@ -28,9 +29,10 @@ class ForumRepositoryTest(TestCase):
         forums = ForumRepository.get_forums_by_user(self.user)
         self.assertEqual(len(forums), 2)
 
-    # def test_get_latest_forum(self):
-    #     latest_forum = ForumRepository.get_latest_forum()
-    #     self.assertEqual(latest_forum, self.forum2)
+    def test_get_latest_forum(self):
+        latest_forum = ForumRepository.get_latest_forum()
+        manually_latest = Forum.objects.order_by('-timestamp').first()
+        self.assertEqual(latest_forum.id, manually_latest.id)
 
     def test_delete_forum(self):
         ForumRepository.delete_forum(self.forum1)
@@ -54,3 +56,22 @@ class ForumRepositoryTest(TestCase):
 
         forum_from_db = Forum.objects.get(id=self.forum1.id)
         self.assertEqual(forum_from_db.description, "Updated Forum post")
+
+    def test_get_forum_by_id_not_found(self):
+        non_existent_id = uuid4()
+        with self.assertRaises(Http404):
+            ForumRepository.get_forum_by_id(non_existent_id)
+
+    def test_get_forums_by_user_empty(self):
+        # Test with user that has no forums
+        new_user = User.objects.create_user(username='new_user', password='testpass')
+        forums = ForumRepository.get_forums_by_user(new_user)
+        self.assertEqual(len(forums), 0)
+
+    def test_update_forum_not_found(self):
+        non_existent_id = uuid4()
+        with self.assertRaises(Http404):
+            ForumRepository.update_forum(
+                forum_id=non_existent_id,
+                description="Should fail"
+            )
