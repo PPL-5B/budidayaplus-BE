@@ -10,11 +10,12 @@ from datetime import datetime
 class ForumSchemaTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username='schema_user',
-            password='testpass',
-            first_name='Schema',
-            last_name='User'
+        username="schema_user",
+        first_name="Schema",
+        last_name="User"
         )
+        self.user.set_password("testpass") 
+        self.user.save() 
         self.forum = Forum.objects.create(
             user=self.user,
             description="Schema output test"

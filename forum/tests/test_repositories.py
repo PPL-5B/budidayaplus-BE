@@ -7,7 +7,9 @@ from django.http import Http404
 
 class ForumRepositoryTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='repo_user', password='testpass')
+        self.user = User.objects.create_user(username="repo_user")
+        self.user.set_password("testpass")  
+        self.user.save()
         self.forum1 = ForumRepository.create_forum(
             user=self.user,
             description="Forum post 1"
@@ -64,7 +66,9 @@ class ForumRepositoryTest(TestCase):
 
     def test_get_forums_by_user_empty(self):
         # Test with user that has no forums
-        new_user = User.objects.create_user(username='new_user', password='testpass')
+        new_user = User.objects.create_user(username="new_user")
+        new_user.set_password("testpass")  
+        new_user.save() 
         forums = ForumRepository.get_forums_by_user(new_user)
         self.assertEqual(len(forums), 0)
 
