@@ -14,7 +14,7 @@ from user_profile.utils import get_supervisor
 
 from fish_death.models import FishDeath
 from fish_death.schemas import FishDeathCreateSchema, FishDeathOutputSchema, FishDeathList
-from fish_death.services.fish_death_services import FishDeathService
+from fish_death.services.fish_death_service import FishDeathService
 from fish_death.repositories.fish_death_repository import FishDeathRepository
 
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
@@ -49,17 +49,16 @@ def create_fish_death(request, pond_id: str, cycle_id: str, payload: FishDeathCr
     if payload.fish_death_count < 0:
         raise HttpError(400, INVALID_FISH_DEATH_COUNT)
 
-    # Retrieve fish_alive_count from the PondFishAmount model attached to the pond and cycle.
-    try:
-        pond_fish_amount = PondFishAmount.objects.get(pond=pond, cycle=cycle)
-        fish_alive_count = pond_fish_amount.fish_amount
-    except PondFishAmount.DoesNotExist:
-        fish_alive_count = 0
+    # # Retrieve fish_alive_count from the PondFishAmount model attached to the pond and cycle.
+    # try:
+    #     pond_fish_amount = PondFishAmount.objects.get(pond=pond, cycle=cycle)
+    #     fish_alive_count = pond_fish_amount.fish_amount
+    # except PondFishAmount.DoesNotExist:
+    #     fish_alive_count = 0
 
     full_payload = {
         "fish_death_count": payload.fish_death_count,
         "recorded_at": make_aware(datetime.now()),
-        "fish_alive_count": fish_alive_count,
     }
     payload_obj = SimpleNamespace(**full_payload)
 
