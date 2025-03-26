@@ -1,4 +1,3 @@
-from uuid import uuid4
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum
@@ -45,9 +44,21 @@ class ForumRepositoryTest(TestCase):
             
     def test_get_latest_forum_returns_none_when_no_forum(self):
         Forum.objects.all().delete()
-        
         latest_forum = ForumRepository.get_latest_forum()
         self.assertIsNone(latest_forum)
+    
+    def test_get_replies(self):
+        # Initially, forum1 should have no replies.
+        replies = ForumRepository.get_replies(self.forum1)
+        self.assertEqual(len(replies), 0)
+        reply = ForumRepository.create_forum(
+            user=self.user,
+            description="Reply to forum1",
+            parent=self.forum1
+        )
+        replies = ForumRepository.get_replies(self.forum1)
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0], reply)
 
     def test_update_forum(self):
         updated_forum = ForumRepository.update_forum(

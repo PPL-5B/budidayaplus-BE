@@ -11,10 +11,11 @@ class ForumRepository:
         return get_object_or_404(Forum, id=forum_id)
 
     @staticmethod
-    def create_forum(user: User, description: str) -> Forum:
+    def create_forum(user: User, description: str, parent: Optional[Forum] = None) -> Forum:
         return Forum.objects.create(
             user=user,
             description=description,
+            parent=parent
         )
     
     @staticmethod
@@ -35,6 +36,11 @@ class ForumRepository:
             return Forum.objects.latest('timestamp')
         except ObjectDoesNotExist:
             return None
+    
+    @staticmethod
+    def get_replies(forum: Forum) -> List[Forum]:
+        # Returns all replies for a given forum post.
+        return list(forum.replies.all())
         
     @staticmethod
     def update_forum(forum_id: UUID, description: str) -> Forum:
