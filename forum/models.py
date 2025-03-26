@@ -7,6 +7,9 @@ class Forum(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     description = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
 
     def __str__(self):
+        if self.parent:
+            return f"Reply {self.id} by {self.user.username} to Forum {self.parent.id}"
         return f"Forum Post {self.id} by {self.user.username}"
