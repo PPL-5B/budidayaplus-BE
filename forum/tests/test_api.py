@@ -1,4 +1,5 @@
 # test_api.py
+from unittest.mock import patch
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from forum.models import Forum
@@ -11,6 +12,7 @@ class ForumUpdateTestCase(TestCase):
         self.user = User.objects.create_user(username="testuser", password="password123")
         self.other_user = User.objects.create_user(username="otheruser", password="password123")
         self.forum = Forum.objects.create(user=self.user, description="Original Post")
+        self.forum_id = str(self.forum.id)
 
     def test_update_forum_success(self):
         """Test update forum oleh pemiliknya"""
