@@ -6,24 +6,11 @@ from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchem
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
 
-
-
-
 router = Router()
-
 
 @router.post("/create", response=ForumOutputSchema, auth=JWTAuth())
 def create_forum(request, data: ForumCreateSchema):
-    """
-    Endpoint untuk membuat forum baru.
-    Pengguna harus login untuk bisa membuat postingan forum.
-    Jika `parent_id` diberikan, maka postingan ini akan menjadi reply ke forum lain.
-    """
-    # print("Headers:", request.headers)
-    # print("Request user:", request.user)
-    # print("Is authenticated:", request.user.is_authenticated)
-    # print("User details:", vars(request.user) if request.user else "No user")
-    # Check authentication
+
     if not request.user.is_authenticated: return Response({"error": "You are not authorized to create this forum post."}, status=403)
    
     parent_forum = None
