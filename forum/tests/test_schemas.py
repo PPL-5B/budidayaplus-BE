@@ -8,10 +8,10 @@ class ForumSchemaTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username='schema_user',
-            password='testpass',
             first_name='Schema',
             last_name='User'
         )
+        self.user.set_password("testpass")
 
     def test_forum_create_schema(self):
         data = {"description": "Test forum create schema"}
