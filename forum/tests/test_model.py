@@ -17,7 +17,7 @@ class ForumModelTest(TestCase):
         self.assertEqual(forum.user, self.user)
         self.assertEqual(forum.description, "Original forum post")
         self.assertIsNotNone(forum.timestamp)
-        self.assertIsNone(forum.parent)  # Original post has no parent.
+        self.assertIsNone(forum.parent)
         self.assertIn(self.user.username, str(forum))
     
     def test_create_reply_forum_post(self):
@@ -33,6 +33,5 @@ class ForumModelTest(TestCase):
         self.assertIsNotNone(reply.id)
         self.assertEqual(reply.parent, parent_post)
         self.assertEqual(reply.description, "This is a reply")
-        # Verify the reverse relation works.
         self.assertIn(reply, list(parent_post.replies.all()))
         self.assertIn("Reply", str(reply))

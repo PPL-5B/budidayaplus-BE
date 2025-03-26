@@ -1,8 +1,15 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum
-from forum.schemas import ForumCreateSchema, ForumListSchema, ForumOutputSchema, ForumUpdateSchema, UserSchema
+from forum.schemas import (
+    ForumCreateSchema,
+    ForumListSchema,
+    ForumOutputSchema,
+    ForumUpdateSchema,
+    UserSchema,
+)
 from datetime import datetime
+from uuid import uuid4  # In case you need to generate a uuid
 
 class ForumSchemaTest(TestCase):
     def setUp(self):
@@ -84,6 +91,11 @@ class ForumSchemaTest(TestCase):
 
     def test_forum_list_schema(self):
         """Test ForumListSchema with multiple forums"""
+        # Create two forum posts
+        forum1 = Forum.objects.create(
+            user=self.user,
+            description="First forum"
+        )
         forum2 = Forum.objects.create(
             user=self.user,
             description="Second forum"
@@ -98,20 +110,26 @@ class ForumSchemaTest(TestCase):
         
         forums_data = [
             {
-                "id": self.forum.id,
+                "id": forum1.id,
                 "user": user_data,
-                "description": self.forum.description,
-                "timestamp": self.forum.timestamp,
+                "description": forum1.description,
+                "timestamp": forum1.timestamp,
+                # Optionally include "parent_id" if needed:
+                "parent_id": None,
+                # And "replies" if you want to test replies in list output:
+                "replies": []
             },
             {
                 "id": forum2.id,
                 "user": user_data,
                 "description": forum2.description,
                 "timestamp": forum2.timestamp,
+                "parent_id": None,
+                "replies": []
             }
         ]
         
         list_schema = ForumListSchema(forums=forums_data)
         self.assertEqual(len(list_schema.forums), 2)
-        self.assertEqual(list_schema.forums[0].id, self.forum.id)
+        self.assertEqual(list_schema.forums[0].id, forum1.id)
         self.assertEqual(list_schema.forums[1].description, forum2.description)
