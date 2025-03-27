@@ -1,14 +1,35 @@
 from ninja import Router
+from ninja.responses import Response
 from uuid import UUID
-from django.http import Http404
 from django.contrib.auth.models import User
-from forum.schemas import ForumUpdateSchema, ForumOutputSchema
+from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema
 from forum.repositories.forum_repository import ForumRepository
-from django.shortcuts import get_object_or_404
+from ninja_jwt.authentication import JWTAuth
 
 router = Router()
 
-@router.put("/{forum_id}", response=ForumOutputSchema)
+@router.post("/create", response=ForumOutputSchema, auth=JWTAuth())
+def create_forum(request, data: ForumCreateSchema):
+
+    if not request.user.is_authenticated: return Response({"error": "You are not authorized to create this forum post."}, status=403)
+   
+    parent_forum = None
+    if data.parent_id:
+        try:
+            parent_forum = ForumRepository.get_forum_by_id(UUID(data.parent_id))
+        except Exception:
+            return Response({
+                "error": "Invalid parent forum ID"
+            }, status=400)
+   
+    new_forum = ForumRepository.create_forum(
+        user=request.user,
+        description=data.description,
+        parent=parent_forum
+    )
+    return new_forum
+
+@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     """
     Endpoint untuk memperbarui deskripsi forum.
