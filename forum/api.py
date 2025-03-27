@@ -2,7 +2,7 @@ from ninja import Router
 from ninja.responses import Response
 from uuid import UUID
 from django.contrib.auth.models import User
-from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema
+from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
 
@@ -28,3 +28,23 @@ def create_forum(request, data: ForumCreateSchema):
         parent=parent_forum
     )
     return new_forum
+
+@router.post("/create_reply", response=ForumReplySchema, auth=JWTAuth())
+def create_reply(request, data: ForumCreateSchema):
+    # Ensure a parent forum ID is provided since this is a reply.
+    if not data.parent_id:
+        return Response({"error": "Parent forum ID is required to create a reply."}, status=400)
+    
+    # Validate that the parent forum exists.
+    try:
+        parent_forum = ForumRepository.get_forum_by_id(UUID(str(data.parent_id)))
+    except Exception:
+        return Response({"error": "Invalid parent forum ID"}, status=400)
+    
+    # Create the reply, associating it with the parent forum.
+    reply = ForumRepository.create_forum(
+        user=request.user,
+        description=data.description,
+        parent=parent_forum
+    )
+    return reply
