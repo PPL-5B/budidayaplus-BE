@@ -79,7 +79,17 @@ class FishDeathService:
         existing_fish_death = self.repository.get_existing_fish_death(cycle, pond, today)
 
         latest = self.repository.get_latest_fish_death(pond, cycle)
-        
+
+        pond_fish_amount = PondFishAmount.objects.get(pond=pond, cycle=cycle)
+        fish_seed = pond_fish_amount.fish_amount
+        current_alive = latest.fish_alive_count if latest else fish_seed
+
+        if payload.fish_death_count > current_alive:
+            raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({current_alive} ekor).")
+
+        if payload.fish_death_count > fish_seed:
+            raise HttpError(400, f"Jumlah ikan mati melebihi jumlah bibit awal ({fish_seed} ekor).")
+
         if existing_fish_death:
             self.repository.delete_fish_death(existing_fish_death)
         
