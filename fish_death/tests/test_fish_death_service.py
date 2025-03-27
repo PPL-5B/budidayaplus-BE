@@ -3,8 +3,6 @@ from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
 from ninja.errors import HttpError
 from fish_death.repositories.fish_death_repository import FishDeathRepository
-import json
-import logging
 from fish_death.schemas import FishDeathCreateSchema
 from fish_death.models import FishDeath
 from fish_death.services.fish_death_service import FishDeathService
