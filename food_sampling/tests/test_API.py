@@ -134,10 +134,6 @@ class FoodSamplingAPITest(TestCase):
         response = self.client.get(f'/{self.pond.pond_id}/', headers={})
         self.assertEqual(response.status_code, 401)
     
-    # def test_list_food_sampling_by_invalid_cycle(self):
-    #     response = self.client.get(f'{uuid.uuid4()}/{self.pond.pond_id}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})
-    #     self.assertEqual(response.status_code, 500)
-    
     def test_list_food_sampling_by_invalid_pond(self):
         with patch('food_sampling.services.food_sampling_service.get_supervisor', return_value=self.user):
             response = self.client.get(f'/{uuid.uuid4()}/', headers={"Authorization": f"Bearer {str(AccessToken.for_user(self.user))}"})

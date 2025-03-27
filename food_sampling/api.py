@@ -18,6 +18,7 @@ from django.contrib.auth.models import User
 DATA_NOT_FOUND = "Data tidak ditemukan"
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
 UNAUTHORIZED_ACCESS = "Anda tidak memiliki akses untuk melihat data ini"
+UNEXPECTED_ERROR = "An unexpected error occurred"
 
 router = Router()
 food_sampling_service = FoodSamplingService(FoodSamplingRepository())
@@ -29,7 +30,7 @@ def get_food_sampling(request, cycle_id: str, pond_id: str, sampling_id: str):
     except HttpError as e:
         raise e
     except Exception:
-        raise HttpError(500, "An unexpected error occurred")
+        raise HttpError(500, UNEXPECTED_ERROR)
 
 
 @router.get("/{pond_id}/", auth=JWTAuth(), response={200: FoodSamplingList})
@@ -40,7 +41,7 @@ def list_food_samplings(request, pond_id: str):
     except HttpError as e:
         raise e
     except Exception:
-        raise HttpError(500, "An unexpected error occurred")
+        raise HttpError(500, UNEXPECTED_ERROR)
 
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: FoodSamplingOutputSchema})
 def get_latest_food_sampling(request, pond_id: str, cycle_id: str):
@@ -49,7 +50,7 @@ def get_latest_food_sampling(request, pond_id: str, cycle_id: str):
     except HttpError as e:
         raise e
     except Exception:
-        raise HttpError(500, "An unexpected error occurred")
+        raise HttpError(500, UNEXPECTED_ERROR)
 
 @router.post("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: FoodSamplingOutputSchema})
 def create_food_sampling(request, pond_id:str, cycle_id:str, payload:FoodSamplingCreateSchema):
@@ -58,4 +59,4 @@ def create_food_sampling(request, pond_id:str, cycle_id:str, payload:FoodSamplin
     except HttpError as e:
         raise e
     except Exception:
-        raise HttpError(500, "An unexpected error occurred")
+        raise HttpError(500, UNEXPECTED_ERROR)
