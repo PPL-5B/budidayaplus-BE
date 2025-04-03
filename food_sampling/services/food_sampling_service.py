@@ -14,7 +14,6 @@ class FoodSamplingService:
     INVALID_FOOD_QUANTITY = "Input kuantitas makanan tidak valid"
     UNAUTHORIZED_ACCESS = "Anda tidak memiliki akses untuk melihat data ini"
 
-    # dummy data sebelum ada culture template
     food_sampling_target = {i: {'food_quantity': i} for i in range(1, 31)}
 
     def __init__(self, repository: FoodSamplingRepository):
@@ -114,5 +113,5 @@ class FoodSamplingService:
 
         target_food_quantity = self.food_sampling_target.get(1, {}).get('food_quantity', 0)
         food_sampling.target_food_quantity = target_food_quantity
-
+        
         return food_sampling
