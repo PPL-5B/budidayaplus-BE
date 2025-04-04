@@ -5,7 +5,7 @@ import uuid
 import json
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.tokens import RefreshToken
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.utils import timezone
 
 class ForumAPITestCase(TestCase):
@@ -171,11 +171,11 @@ class ForumAPITestCase(TestCase):
     def test_get_latest_forum_success(self):
         """Test retrieving the latest forum."""
         old_forum = ForumRepository.create_forum(user=self.user, description="Old forum")
-        old_forum.timestamp = datetime.now() - timedelta(days=1)
+        old_forum.timestamp = timezone.now() - timedelta(days=1) 
         old_forum.save()
 
         latest_forum = ForumRepository.create_forum(user=self.user, description="Latest forum")
-        latest_forum.timestamp = datetime.now()
+        latest_forum.timestamp = timezone.now() 
         latest_forum.save()
 
         response = self._authenticated_get("/api/forum/get_latest", self.user_token)
