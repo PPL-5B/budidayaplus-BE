@@ -1,11 +1,12 @@
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
-from forum.models import Forum
-from django.contrib.auth.models import User, AnonymousUser
+from django.contrib.auth.models import User
 import uuid
 import json
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.tokens import RefreshToken
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 class ForumAPITestCase(TestCase):
     def setUp(self):
@@ -122,3 +123,82 @@ class ForumAPITestCase(TestCase):
         response = self._authenticated_post("/api/forum/create_reply", data, self.user_token)
         self.assertEqual(response.status_code, 422)
         self.assertIn("detail", response.json())
+
+    def _authenticated_get(self, url, token):
+        """Helper to make an authenticated GET request."""
+        return self.client.get(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+
+    def test_get_forum_by_id_success(self):
+        """Test retrieving a forum by its ID."""
+        forum = ForumRepository.create_forum(user=self.user, description="Test forum")
+        response = self._authenticated_get(f"/api/forum/get_by_id/{forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["description"], "Test forum")
+
+    def test_get_forum_by_id_not_found(self):
+        """Test retrieving a forum with a non-existent ID."""
+        response = self._authenticated_get(f"/api/forum/get_by_id/{uuid.uuid4()}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+
+    def test_list_forums_success(self):
+        """Test retrieving a list of all forums."""
+        ForumRepository.create_forum(user=self.user, description="Forum 1")
+        ForumRepository.create_forum(user=self.user, description="Forum 2")
+        response = self._authenticated_get("/api/forum/list", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 2)
+
+    def test_get_forums_by_user_success(self):
+        """Test retrieving forums created by the authenticated user."""
+        ForumRepository.create_forum(user=self.user, description="User's forum")
+        another_user = User.objects.create_user(username="anotheruser", password="password123")
+        ForumRepository.create_forum(user=another_user, description="Another user's forum")
+        response = self._authenticated_get("/api/forum/get_by_user", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]["description"], "User's forum")
+
+    def test_get_forums_by_user_unauthenticated(self):
+        """Test retrieving forums by user without authentication."""
+        response = self.client.get("/api/forum/get_by_user")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_latest_forum_success(self):
+        """Test retrieving the latest forum."""
+        old_forum = ForumRepository.create_forum(user=self.user, description="Old forum")
+        old_forum.timestamp = datetime.now() - timedelta(days=1)
+        old_forum.save()
+
+        latest_forum = ForumRepository.create_forum(user=self.user, description="Latest forum")
+        latest_forum.timestamp = datetime.now()
+        latest_forum.save()
+
+        response = self._authenticated_get("/api/forum/get_latest", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["description"], "Latest forum")
+
+    def test_get_latest_forum_not_found(self):
+        """Test retrieving the latest forum when no forums exist."""
+        response = self._authenticated_get("/api/forum/get_latest", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+
+    def test_get_replies_success(self):
+        """Test retrieving replies for a forum."""
+        parent_forum = ForumRepository.create_forum(user=self.user, description="Parent forum")
+        ForumRepository.create_forum(user=self.user, description="Reply 1", parent=parent_forum)
+        ForumRepository.create_forum(user=self.user, description="Reply 2", parent=parent_forum)
+        response = self._authenticated_get(f"/api/forum/get_replies/{parent_forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 2)
+
+    def test_get_replies_forum_not_found(self):
+        """Test retrieving replies for a non-existent forum."""
+        response = self._authenticated_get(f"/api/forum/get_replies/{uuid.uuid4()}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
