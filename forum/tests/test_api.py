@@ -132,19 +132,30 @@ class ForumAPITestCase(TestCase):
         self.assertIn("detail", response.json())
 
     def test_delete_forum_success(self):
+        """
+        Test bahwa forum berhasil dihapus ketika request dilakukan oleh user yang membuatnya.
+        Expected: 200 OK dan message sukses.
+        """
         forum = ForumRepository.create_forum(user=self.user, description="Forum to delete")
         response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["message"], "Forum deleted successfully.")
     
     def test_delete_forum_not_found(self):
+        """
+        Test menghapus forum dengan UUID yang tidak ada di database.
+        Expected: 404 Not Found atau 403 jika valid tapi bukan milik user.
+        """
         random_uuid = uuid.uuid4()
         response = self._authenticated_delete(f"/api/forum/delete/{random_uuid}", self.user_token)
         self.assertIn(response.status_code, [404, 403])
         self.assertTrue("error" in response.json() or "detail" in response.json())
 
-
     def test_delete_forum_unauthenticated(self):
+        """
+        Test menghapus forum tanpa autentikasi (tanpa token).
+        Expected: 401 Unauthorized.
+        """
         forum = ForumRepository.create_forum(user=self.user, description="Forum with no auth")
         response = self.client.delete(f"/api/forum/delete/{forum.id}")
         self.assertEqual(response.status_code, 401)
