@@ -22,6 +22,14 @@ class ForumAPITestCase(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
     
+    def _authenticated_delete(self, url, token):
+        """Helper to make an authenticated DELETE request."""
+        return self.client.delete(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+
     def test_create_forum_success(self):
         """Test creating a forum post successfully."""
         data = {"description": "My first forum post"}

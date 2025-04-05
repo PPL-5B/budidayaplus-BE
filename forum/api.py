@@ -48,3 +48,4 @@ def create_reply(request, data: ForumCreateSchema):
         parent=parent_forum
     )
     return reply
+
