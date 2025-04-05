@@ -49,3 +49,14 @@ def create_reply(request, data: ForumCreateSchema):
     )
     return reply
 
+@router.delete("/delete/{forum_id}", auth=JWTAuth())
+def delete_forum(request, forum_id: UUID):
+    forum = ForumRepository.get_forum_by_id(forum_id)
+    if forum is None:
+        return Response({"error": "Not Found."}, status=404)
+
+    if forum.user != request.user:
+        return Response({"error": "You are not authorized to delete this forum."}, status=403)
+
+    forum.delete()
+    return {"message": "Forum deleted successfully."}
