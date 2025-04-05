@@ -122,3 +122,21 @@ class ForumAPITestCase(TestCase):
         response = self._authenticated_post("/api/forum/create_reply", data, self.user_token)
         self.assertEqual(response.status_code, 422)
         self.assertIn("detail", response.json())
+
+    def test_delete_forum_success(self):
+        forum = ForumRepository.create_forum(user=self.user, description="Forum to delete")
+        response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "Forum deleted successfully.")
+    
+    def test_delete_forum_not_found(self):
+        random_uuid = uuid.uuid4()
+        response = self._authenticated_delete(f"/api/forum/delete/{random_uuid}", self.user_token)
+        self.assertIn(response.status_code, [404, 403])
+        self.assertTrue("error" in response.json() or "detail" in response.json())
+
+
+    def test_delete_forum_unauthenticated(self):
+        forum = ForumRepository.create_forum(user=self.user, description="Forum with no auth")
+        response = self.client.delete(f"/api/forum/delete/{forum.id}")
+        self.assertEqual(response.status_code, 401)
