@@ -144,12 +144,27 @@ class ForumAPITestCase(TestCase):
     def test_delete_forum_not_found(self):
         """
         Test menghapus forum dengan UUID yang tidak ada di database.
-        Expected: 404 Not Found atau 403 jika valid tapi bukan milik user.
+        Expected: 404 Not Found.
         """
-        random_uuid = uuid.uuid4()
+        random_uuid = uuid.uuid4()  # UUID yang tidak ada di DB
         response = self._authenticated_delete(f"/api/forum/delete/{random_uuid}", self.user_token)
-        self.assertIn(response.status_code, [404, 403])
-        self.assertTrue("error" in response.json() or "detail" in response.json())
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "Not Found.")
+
+
+    def test_delete_forum_not_owned(self):
+        """
+        Test menghapus forum yang dibuat oleh user lain.
+        Expected: 403 Forbidden.
+        """
+        # Buat user lain
+        other_user = User.objects.create_user(username="lain", password="test1234")
+        forum = ForumRepository.create_forum(user=other_user, description="Not yours")
+        
+        response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "You are not authorized to delete this forum.")
+
 
     def test_delete_forum_unauthenticated(self):
         """
