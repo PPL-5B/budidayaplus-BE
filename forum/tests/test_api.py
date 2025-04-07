@@ -29,6 +29,14 @@ class ForumAPITestCase(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
     
+    def _authenticated_delete(self, url, token):
+        """Helper to make an authenticated DELETE request."""
+        return self.client.delete(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+
     def test_create_forum_success(self):
         """Test creating a forum post successfully."""
         data = {"description": "My first forum post"}
@@ -129,6 +137,50 @@ class ForumAPITestCase(TestCase):
         response = self._authenticated_post("/api/forum/create_reply", data, self.user_token)
         self.assertEqual(response.status_code, 422)
         self.assertIn("detail", response.json())
+
+    def test_delete_forum_success(self):
+        """
+        Test bahwa forum berhasil dihapus ketika request dilakukan oleh user yang membuatnya.
+        Expected: 200 OK dan message sukses.
+        """
+        forum = ForumRepository.create_forum(user=self.user, description="Forum to delete")
+        response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "Forum deleted successfully.")
+    
+    def test_delete_forum_not_found(self):
+        """
+        Test menghapus forum dengan UUID yang tidak ada di database.
+        Expected: 404 Not Found.
+        """
+        random_uuid = uuid.uuid4()  # UUID yang tidak ada di DB
+        response = self._authenticated_delete(f"/api/forum/delete/{random_uuid}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "Not Found.")
+
+
+    def test_delete_forum_not_owned(self):
+        """
+        Test menghapus forum yang dibuat oleh user lain.
+        Expected: 403 Forbidden.
+        """
+        # Buat user lain
+        other_user = User.objects.create_user(username="lain", password="test1234")
+        forum = ForumRepository.create_forum(user=other_user, description="Not yours")
+        
+        response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "You are not authorized to delete this forum.")
+
+
+    def test_delete_forum_unauthenticated(self):
+        """
+        Test menghapus forum tanpa autentikasi (tanpa token).
+        Expected: 401 Unauthorized.
+        """
+        forum = ForumRepository.create_forum(user=self.user, description="Forum with no auth")
+        response = self.client.delete(f"/api/forum/delete/{forum.id}")
+        self.assertEqual(response.status_code, 401)
 
     def _authenticated_get(self, url, token):
         """Helper to make an authenticated GET request."""
@@ -338,4 +390,3 @@ class ForumAPITestCase(TestCase):
         self.assertIn("user", response_data)
         self.assertIn("created_at", response_data)
         self.assertIn("parent", response_data)
-
