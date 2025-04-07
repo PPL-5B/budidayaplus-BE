@@ -87,9 +87,6 @@ class FishDeathService:
         if payload.fish_death_count > current_alive:
             raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({current_alive} ekor).")
 
-        if payload.fish_death_count > fish_seed:
-            raise HttpError(400, f"Jumlah ikan mati melebihi jumlah bibit awal ({fish_seed} ekor).")
-
         if existing_fish_death:
             self.repository.delete_fish_death(existing_fish_death)
         
