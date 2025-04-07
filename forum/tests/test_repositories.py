@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from forum.models import Forum
 from forum.repositories.forum_repository import ForumRepository
 from django.http import Http404
+from uuid import uuid4
 
 class ForumRepositoryTest(TestCase):
     def setUp(self):
@@ -48,7 +49,6 @@ class ForumRepositoryTest(TestCase):
         self.assertIsNone(latest_forum)
     
     def test_get_replies(self):
-        # Initially, forum1 should have no replies.
         replies = ForumRepository.get_replies(self.forum1)
         self.assertEqual(len(replies), 0)
         reply = ForumRepository.create_forum(
@@ -76,7 +76,6 @@ class ForumRepositoryTest(TestCase):
             ForumRepository.get_forum_by_id(non_existent_id)
 
     def test_get_forums_by_user_empty(self):
-        # Test with user that has no forums
         new_user = User.objects.create_user(username="new_user")
         new_user.set_password("testpass")  
         new_user.save() 

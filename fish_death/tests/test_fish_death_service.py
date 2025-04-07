@@ -10,6 +10,7 @@ from pond.models import Pond
 from cycle.models import Cycle
 from django.core.exceptions import ObjectDoesNotExist
 
+
 class TestFishDeathService(unittest.TestCase):
     def setUp(self):
         self.repository = Mock(spec=FishDeathRepository)
@@ -267,5 +268,3 @@ class TestFishDeathService(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 401)
         self.assertEqual(context.exception.message, self.service.UNAUTHORIZED_ACCESS)
-
-
