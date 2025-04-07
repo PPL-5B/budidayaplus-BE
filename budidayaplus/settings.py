@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'tasks',
     'threshold',
     'fish_death',
+    'forum'
 ]
 
 NINJA_JWT = {
