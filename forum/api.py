@@ -84,3 +84,17 @@ def get_replies(request, forum_id: UUID):
         return replies
     except Exception:
         return Response({"error": "Forum not found or invalid forum ID"}, status=404)
+
+@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
+def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
+    """
+    Endpoint untuk memperbarui deskripsi forum.
+    """
+    forum = ForumRepository.get_forum_by_id(forum_id)
+    
+    if request.user != forum.user:
+        return {"error": "You are not authorized to update this forum post."}, 403
+    
+    updated_forum = ForumRepository.update_forum(forum_id, data.description)
+    return updated_forum
+
