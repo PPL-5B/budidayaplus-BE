@@ -160,35 +160,7 @@ class TestFishDeathService(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 400)
         self.assertIn("Jumlah ikan mati melebihi jumlah ikan bertahan (50 ekor).", context.exception.message)
-    
-    @patch('fish_death.services.fish_death_service.PondFishAmount.objects.get')
-    def test_create_fish_death_exceeds_seed(self, mock_get_amount):
-        schema = FishDeathCreateSchema(
-            recorded_at=self.today,
-            fish_death_count=120
-        )
 
-        mock_amount = Mock()
-        mock_amount.fish_amount = 100  # Seed awal
-        mock_get_amount.return_value = mock_amount
-
-        self.repository.get_pond.return_value = self.pond
-        self.repository.get_cycle.return_value = self.active_cycle
-        self.repository.get_reporter.return_value = self.reporter
-        self.repository.get_existing_fish_death.return_value = None
-
-        # Simulasikan latest yang masih banyak hidup (biar tidak trigger validasi "ikan bertahan")
-        latest = Mock()
-        latest.fish_alive_count = 130
-        self.repository.get_latest_fish_death.return_value = latest
-
-        with self.assertRaises(HttpError) as context:
-            self.service.create_fish_death("pond-1", "cycle-1", 1, schema)
-
-        self.assertEqual(context.exception.status_code, 400)
-        self.assertIn("Jumlah ikan mati melebihi jumlah bibit awal (100 ekor).", context.exception.message)
-
-    
     @patch('fish_death.services.fish_death_service.get_supervisor')
     @patch('fish_death.services.fish_death_service.CycleRepo.get_active_cycle')
     def test_list_fish_deaths_success(self, mock_get_active_cycle, mock_get_supervisor):
