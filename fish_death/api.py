@@ -49,7 +49,6 @@ def create_fish_death(request, pond_id: str, cycle_id: str, payload: FishDeathCr
     if payload.fish_death_count < 0:
         raise HttpError(400, INVALID_FISH_DEATH_COUNT)
 
-
     full_payload = {
         "fish_death_count": payload.fish_death_count,
         "recorded_at": make_aware(datetime.now()),
