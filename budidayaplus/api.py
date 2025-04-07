@@ -11,6 +11,7 @@ from threshold.api import router as threshold_router
 from fish_death.api import router as fish_death_router
 from forum.api import router as forum_router
 
+
 api = NinjaAPI()
 api.add_router("/cycle/", cycle_router)
 api.add_router("/auth/", auth_router)
