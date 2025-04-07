@@ -12,6 +12,7 @@ class FishSampling(models.Model):
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE)
     fish_weight = models.FloatField(validators=[MinValueValidator(0.0)])
     fish_length = models.FloatField(validators=[MinValueValidator(0.0)])
+    fish_dead = models.IntegerField(validators=[MinValueValidator(0)], default=0)
     recorded_at = models.DateTimeField()
 
     def __str__(self):

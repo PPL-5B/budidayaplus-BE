@@ -4,7 +4,9 @@ from forum.models import Forum
 
 class ForumModelTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.user = User.objects.create_user(username="testuser")
+        self.user.set_password("testpass") 
+        self.user.save()
 
     def test_create_original_forum_post(self):
         forum = Forum.objects.create(
