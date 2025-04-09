@@ -14,7 +14,6 @@ from datetime import timedelta
 from pathlib import Path
 from django.conf import settings
 import os
-# from dotenv import load_dotenv 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +35,8 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
-    "https://budidayaplus-fe-gray.vercel.app"
+    "https://budidayaplus-fe-gray.vercel.app",
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 
@@ -141,7 +141,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
     "http://localhost:8080",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 CORS_ALLOW_METHODS = [
