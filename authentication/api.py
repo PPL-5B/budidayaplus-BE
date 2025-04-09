@@ -13,16 +13,20 @@ router = Router()
 @router.post("/login", throttle=AnonRateThrottle(rate="10/h"))
 def login(request, data: LoginSchema):
     try:
+        print("Login attempt with data:", data.dict())
         user = User.objects.get(username=data.phone_number)
         if not user.check_password(data.password):
             raise HttpError(404, "Pengguna tidak terdaftar atau kata sandi salah")
 
+        print('tes')
         refresh = RefreshToken.for_user(user)
+        print('access token:' + refresh.access_token)
         return {
             "message": "Login berhasil",
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         }
+    
 
     except User.DoesNotExist:
         raise HttpError(404, "Pengguna tidak terdaftar atau kata sandi salah")
