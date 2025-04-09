@@ -37,7 +37,7 @@ ALLOWED_HOSTS = [
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
     "https://budidayaplus-fe-gray.vercel.app",
-    "https://budidayaplus-fe-alpha.vercel.app/"
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 
@@ -143,7 +143,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://dkn-budidayaplus-staging.vercel.app",
     "http://localhost:8080",
     "http://127.0.0.1:8000",
-    "https://budidayaplus-fe-alpha.vercel.app/"
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 CORS_ALLOW_METHODS = [
