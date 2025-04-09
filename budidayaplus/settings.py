@@ -14,7 +14,6 @@ from datetime import timedelta
 from pathlib import Path
 from django.conf import settings
 import os
-# from dotenv import load_dotenv 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,8 +33,9 @@ ALLOWED_HOSTS = [
     '103.177.95.189', 
     'localhost',
     '127.0.0.1',
-    # "https://dkn-budidayaplus.vercel.app",
-    # "https://dkn-budidayaplus-staging.vercel.app",
+
+    "https://dkn-budidayaplus.vercel.app",
+    "https://dkn-budidayaplus-staging.vercel.app",
     "https://budidayaplus-fe-gray.vercel.app",
     "https://budidayaplus-fe-alpha.vercel.app"
 ]
@@ -60,6 +60,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'tasks',
     'threshold',
+    'fish_death',
+    'forum',
+    'rest_framework',
+    'rest_framework.authtoken',
 ]
 
 NINJA_JWT = {
@@ -107,6 +111,20 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 MIDDLEWARE = [
@@ -124,7 +142,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
     "http://localhost:8080",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 CORS_ALLOW_METHODS = [
@@ -189,7 +208,6 @@ DATABASES = {
 
 
 
-
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -230,3 +248,22 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Sentry
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://d53d83da381b3e92d55a2f9399859789@o4509004052627456.ingest.de.sentry.io/4509004056428624",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for tracing.
+    traces_sample_rate=1.0,
+    _experiments={
+        # Set continuous_profiling_auto_start to True
+        # to automatically start the profiler on when
+        # possible.
+        "continuous_profiling_auto_start": True,
+    },
+)
