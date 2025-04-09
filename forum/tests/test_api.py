@@ -13,8 +13,8 @@ from django.utils import timezone
 class ForumAPITestCase(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username="testuser", password="password123")
-        self.other_user = User.objects.create_user(username="otheruser", password="password123")
+        self.user = User.objects.create_user(username="testuser", password="password123") # NOSONAR
+        self.other_user = User.objects.create_user(username="otheruser", password="password123") # NOSONAR
         self.forum = Forum.objects.create(user=self.user, description="Original Post")
         self.forum_id = str(self.forum.id)
 
@@ -165,7 +165,7 @@ class ForumAPITestCase(TestCase):
         Expected: 403 Forbidden.
         """
         # Buat user lain
-        other_user = User.objects.create_user(username="lain", password="test1234")
+        other_user = User.objects.create_user(username="lain", password="test1234") # NOSONAR
         forum = ForumRepository.create_forum(user=other_user, description="Not yours")
         
         response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
@@ -214,7 +214,7 @@ class ForumAPITestCase(TestCase):
     def test_get_forums_by_user_success(self):
         """Test retrieving forums created by the authenticated user."""
         ForumRepository.create_forum(user=self.user, description="User's forum")
-        another_user = User.objects.create_user(username="anotheruser", password="password123")
+        another_user = User.objects.create_user(username="anotheruser", password="password123") # NOSONAR
         ForumRepository.create_forum(user=another_user, description="Another user's forum")
         response = self._authenticated_get("/api/forum/get_by_user", self.user_token)
         self.assertEqual(response.status_code, 200)
