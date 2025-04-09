@@ -20,7 +20,7 @@ def login(request, data: LoginSchema):
 
         print('tes')
         refresh = RefreshToken.for_user(user)
-        print('access token:' + refresh.access_token)
+        print('access token:' + str(refresh.access_token))
         return {
             "message": "Login berhasil",
             "access": str(refresh.access_token),
