@@ -88,13 +88,19 @@ class FishDeathService:
             raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({current_alive} ekor).")
 
         if existing_fish_death:
-            self.repository.delete_fish_death(existing_fish_death)
-        
-        if latest:
-             fish_alive = max(latest.fish_alive_count - payload.fish_death_count, 0)
-        else:
-            pond_fish_amount = PondFishAmount.objects.get(pond=pond, cycle=cycle)
-            fish_alive = max(pond_fish_amount.fish_amount - payload.fish_death_count, 0)
+            new_death_count = existing_fish_death.fish_death_count + payload.fish_death_count
+            new_alive_count = max(existing_fish_death.fish_alive_count - payload.fish_death_count, 0)
+
+            if new_death_count > fish_seed:
+                raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({fish_seed} ekor).")
+
+            existing_fish_death.fish_death_count = new_death_count
+            existing_fish_death.fish_alive_count = new_alive_count
+            existing_fish_death.save()
+            return existing_fish_death
+
+        # Jika belum ada catatan hari ini, buat baru
+        fish_alive = max(current_alive - payload.fish_death_count, 0)
 
         try:
             fish_death = self.repository.create_fish_death(
