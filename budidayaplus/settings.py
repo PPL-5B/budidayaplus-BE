@@ -36,7 +36,8 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
-    "https://budidayaplus-fe-gray.vercel.app"
+    "https://budidayaplus-fe-gray.vercel.app",
+    "*"
 ]
 
 
@@ -140,7 +141,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
-    "http://localhost:8080",
+    "http://localhost:3000",
     "http://127.0.0.1:8000"
 ]
 

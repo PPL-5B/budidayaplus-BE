@@ -1,5 +1,6 @@
 from ninja import Router
 from ninja.responses import Response
+from typing import List
 from uuid import UUID
 from django.contrib.auth.models import User
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
@@ -48,3 +49,38 @@ def create_reply(request, data: ForumCreateSchema):
         parent=parent_forum
     )
     return reply
+
+@router.get("/get_by_id/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
+def get_forum_by_id(request, forum_id: UUID):
+    try:
+        forum = ForumRepository.get_forum_by_id(forum_id)
+        return forum
+    except Exception:
+        return Response({"error": "Forum not found"}, status=404)
+
+@router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
+def get_list_forums(request):
+    forums = ForumRepository.list_forums()
+    return forums
+
+@router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
+def get_forums_by_user(request):
+    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
+    forums = ForumRepository.get_forums_by_user(request.user)
+    return forums
+
+@router.get("/get_latest", response=ForumOutputSchema, auth=JWTAuth())
+def get_latest_forum(request):
+    forum = ForumRepository.get_latest_forum()
+    if not forum:
+        return Response({"error": "No forums available."}, status=404)
+    return forum
+
+@router.get("/get_replies/{forum_id}", response=List[ForumOutputSchema], auth=JWTAuth())
+def get_replies(request, forum_id: UUID):
+    try:
+        forum = ForumRepository.get_forum_by_id(forum_id)
+        replies = ForumRepository.get_replies(forum)
+        return replies
+    except Exception:
+        return Response({"error": "Forum not found or invalid forum ID"}, status=404)
