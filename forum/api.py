@@ -8,7 +8,6 @@ from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchem
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
 from django.http import Http404, HttpResponse
-from django.http import JsonResponse
 
 router = Router()
 
