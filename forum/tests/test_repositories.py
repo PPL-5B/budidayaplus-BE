@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from django.utils import timezone
 from django.test import TestCase
@@ -9,8 +10,10 @@ from uuid import uuid4
 
 class ForumRepositoryTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="repo_user", password="testpass")
-        self.other_user = User.objects.create_user(username="other_user", password="testpass")
+        self.test_password = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
+
+        self.user = User.objects.create_user(username="repo_user", password=self.test_password)
+        self.other_user = User.objects.create_user(username="other_user", password=self.test_password)
         self.forum1 = ForumRepository.create_forum(
             user=self.user,
             description="Forum post 1"
@@ -73,7 +76,7 @@ class ForumRepositoryTest(TestCase):
             ForumRepository.get_forum_by_id(self.forum1.id)
 
     def test_get_forums_by_user_empty(self):
-        new_user = User.objects.create_user(username="new_user", password="testpass")
+        new_user = User.objects.create_user(username="new_user", password=self.test_password)
         forums = ForumRepository.get_forums_by_user(new_user)
         self.assertEqual(len(forums), 0)
 

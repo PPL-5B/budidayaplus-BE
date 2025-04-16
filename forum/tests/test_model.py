@@ -1,12 +1,13 @@
+import os
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum, ForumVote
 
 class ForumModelTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser")
-        self.user.set_password("testpass") 
-        self.user.save()
+        self.test_password = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
+
+        self.user = User.objects.create_user(username="testuser", password=self.test_password)
 
     def test_create_original_forum_post(self):
         forum = Forum.objects.create(
@@ -40,10 +41,11 @@ class ForumModelTest(TestCase):
         forum = Forum.objects.create(user=self.user, description="Forum with votes")
 
         ForumVote.objects.create(user=self.user, forum=forum, vote_choice='up')
-        user2 = User.objects.create_user(username="user2", password="pass")
+
+        user2 = User.objects.create_user(username="user2", password=self.test_password)
         ForumVote.objects.create(user=user2, forum=forum, vote_choice='up')
 
-        user3 = User.objects.create_user(username="user3", password="pass")
+        user3 = User.objects.create_user(username="user3", password=self.test_password)
         ForumVote.objects.create(user=user3, forum=forum, vote_choice='down')
 
         self.assertEqual(forum.upvotes, 2)

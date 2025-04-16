@@ -1,3 +1,4 @@
+import os
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum
@@ -11,12 +12,13 @@ from forum.schemas import (
 
 class ForumSchemaTest(TestCase):
     def setUp(self):
+        test_password = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
         self.user = User.objects.create_user(
             username='schema_user',
             first_name='Schema',
-            last_name='User'
+            last_name='User',
+            password=test_password
         )
-        self.user.set_password("testpass")
 
     def test_forum_create_schema(self):
         data = {"description": "Test forum create schema"}
@@ -52,7 +54,7 @@ class ForumSchemaTest(TestCase):
             "description": forum.description,
             "timestamp": forum.timestamp,
             "parent_id": None,
-            "replies": [{
+            "replies": [ {
                 "id": reply.id,
                 "user": user_schema_data,
                 "description": reply.description,
@@ -91,7 +93,6 @@ class ForumSchemaTest(TestCase):
 
     def test_forum_list_schema(self):
         """Test ForumListSchema with multiple forums"""
-        # Create two forum posts
         forum1 = Forum.objects.create(
             user=self.user,
             description="First forum"
