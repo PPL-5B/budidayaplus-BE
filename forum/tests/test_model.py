@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
-from forum.models import Forum
+from forum.models import Forum, ForumVote
 
 class ForumModelTest(TestCase):
     def setUp(self):
@@ -35,3 +35,25 @@ class ForumModelTest(TestCase):
         self.assertEqual(reply.description, "This is a reply")
         self.assertIn(reply, list(parent_post.replies.all()))
         self.assertIn("Reply", str(reply))
+    
+    def test_upvote_and_downvote_count(self):
+        forum = Forum.objects.create(user=self.user, description="Forum with votes")
+
+        # Tambah 2 upvotes
+        ForumVote.objects.create(user=self.user, forum=forum, vote_choice='up')
+        user2 = User.objects.create_user(username="user2", password="pass")
+        ForumVote.objects.create(user=user2, forum=forum, vote_choice='up')
+
+        # Tambah 1 downvote
+        user3 = User.objects.create_user(username="user3", password="pass")
+        ForumVote.objects.create(user=user3, forum=forum, vote_choice='down')
+
+        self.assertEqual(forum.upvotes, 2)
+        self.assertEqual(forum.downvotes, 1)
+    
+    def test_user_cannot_vote_twice_on_same_forum(self):
+        forum = Forum.objects.create(user=self.user, description="Forum post")
+        ForumVote.objects.create(user=self.user, forum=forum, vote_choice='up')
+
+        with self.assertRaises(Exception):
+            ForumVote.objects.create(user=self.user, forum=forum, vote_choice='down')
