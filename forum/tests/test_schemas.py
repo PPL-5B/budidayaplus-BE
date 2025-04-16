@@ -8,8 +8,6 @@ from forum.schemas import (
     ForumUpdateSchema,
     UserSchema,
 )
-from datetime import datetime
-from uuid import uuid4  # In case you need to generate a uuid
 
 class ForumSchemaTest(TestCase):
     def setUp(self):
@@ -116,9 +114,7 @@ class ForumSchemaTest(TestCase):
                 "user": user_data,
                 "description": forum1.description,
                 "timestamp": forum1.timestamp,
-                # Optionally include "parent_id" if needed:
                 "parent_id": None,
-                # And "replies" if you want to test replies in list output:
                 "replies": [],
                 "upvotes": 1, 
                 "downvotes": 0  
