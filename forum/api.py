@@ -13,20 +13,23 @@ router = Router()
 
 @router.post("/create", response=ForumOutputSchema, auth=JWTAuth())
 def create_forum(request, data: ForumCreateSchema):
+    if not request.user.is_authenticated:
+        return Response({"error": "You are not authorized to create this forum post."}, status=403)
 
-    if not request.user.is_authenticated: return Response({"error": "You are not authorized to create this forum post."}, status=403)
-   
+    # Post utama harus punya title
+    if data.parent_id is None and not data.title:
+        return Response({"error": "Title wajib diisi."}, status=400)
+
     parent_forum = None
     if data.parent_id:
         try:
-            parent_forum = ForumRepository.get_forum_by_id(UUID(data.parent_id))
+            parent_forum = ForumRepository.get_forum_by_id(UUID(str(data.parent_id)))
         except Exception:
-            return Response({
-                "error": "Invalid parent forum ID"
-            }, status=400)
-   
+            return Response({"error": "Invalid parent forum ID"}, status=400)
+
     new_forum = ForumRepository.create_forum(
         user=request.user,
+        title=data.title,
         description=data.description,
         parent=parent_forum
     )
@@ -34,23 +37,21 @@ def create_forum(request, data: ForumCreateSchema):
 
 @router.post("/create_reply", response=ForumReplySchema, auth=JWTAuth())
 def create_reply(request, data: ForumCreateSchema):
-    # Ensure a parent forum ID is provided since this is a reply.
     if not data.parent_id:
         return Response({"error": "Parent forum ID is required to create a reply."}, status=400)
-    
-    # Validate that the parent forum exists.
     try:
         parent_forum = ForumRepository.get_forum_by_id(UUID(str(data.parent_id)))
     except Exception:
         return Response({"error": "Invalid parent forum ID"}, status=400)
-    
-    # Create the reply, associating it with the parent forum.
+
     reply = ForumRepository.create_forum(
         user=request.user,
+        title=data.title,               # boleh None
         description=data.description,
         parent=parent_forum
     )
     return reply
+
 
 @router.delete("/delete/{forum_id}", auth=JWTAuth())
 def delete_forum(request, forum_id: UUID):
@@ -102,18 +103,19 @@ def get_replies(request, forum_id: UUID):
 
 @router.put("/{forum_id}", response={200: ForumOutputSchema, 403: dict, 404: dict}, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
-    """
-    Endpoint untuk memperbarui deskripsi forum.
-    """
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)
     except Http404:
         return Response({"error": "Forum not found"}, status=404)
-    
+
     if request.user != forum.user:
         return Response({"error": "You are not authorized to update this forum post."}, status=403)
-    
-    updated_forum = ForumRepository.update_forum(forum_id, data.description)
+
+    updated_forum = ForumRepository.update_forum(
+        forum_id,
+        title=data.title,
+        description=data.description
+    )
     return 200, updated_forum
 
 @router.post("/upvote/{forum_id}", auth=JWTAuth())
@@ -143,4 +145,3 @@ def vote_summary(request, forum_id: UUID):
     summary["user_vote"] = user_vote.vote_choice if user_vote else None
 
     return summary
-
