@@ -1,9 +1,10 @@
 from uuid import UUID
 from typing import Optional, List
 from django.shortcuts import get_object_or_404
-from forum.models import Forum
+from forum.models import Forum, ForumVote
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+
 
 class ForumRepository:
     @staticmethod
@@ -11,13 +12,22 @@ class ForumRepository:
         return get_object_or_404(Forum, id=forum_id)
 
     @staticmethod
-    def create_forum(user: User, description: str, parent: Optional[Forum] = None) -> Forum:
+    def create_forum(
+        user: User,
+        title: str | None,
+        description: str,
+        parent: Optional[Forum] = None,
+    ) -> Forum:
+        if parent and (title is None or title.strip() == ""):
+            title = f"Reply {parent.title} Forum"
+
         return Forum.objects.create(
             user=user,
+            title=title or "",      # fallback agar kolom tidak null
             description=description,
-            parent=parent
+            parent=parent,
         )
-    
+
     @staticmethod
     def delete_forum(forum: Forum):
         forum.delete()
@@ -29,22 +39,51 @@ class ForumRepository:
     @staticmethod
     def get_forums_by_user(user: User) -> List[Forum]:
         return Forum.objects.filter(user=user)
-    
+
     @staticmethod
     def get_latest_forum() -> Optional[Forum]:
         try:
             return Forum.objects.latest('timestamp')
         except ObjectDoesNotExist:
             return None
-    
+
     @staticmethod
     def get_replies(forum: Forum) -> List[Forum]:
-        # Returns all replies for a given forum post.
         return list(forum.replies.all())
-        
+
     @staticmethod
-    def update_forum(forum_id: UUID, description: str) -> Forum:
+    def update_forum(forum_id: UUID, title: str | None = None, description: str | None = None) -> Forum:
         forum = get_object_or_404(Forum, id=forum_id)
-        forum.description = description
+        if title is not None:
+            forum.title = title
+        if description is not None:
+            forum.description = description
         forum.save()
         return forum
+
+    @staticmethod
+    def upvote_forum(user: User, forum: Forum):
+        ForumVote.objects.update_or_create(
+            user=user,
+            forum=forum,
+            defaults={'vote_choice': 'up'}
+        )
+    
+    @staticmethod
+    def downvote_forum(user: User, forum: Forum):
+        ForumVote.objects.update_or_create(
+            user=user,
+            forum=forum,
+            defaults={'vote_choice': 'down'}
+        )
+
+    @staticmethod
+    def cancel_vote(user: User, forum: Forum):
+        ForumVote.objects.filter(user=user, forum=forum).delete()
+
+    @staticmethod
+    def get_vote_summary(forum: Forum) -> dict:
+        return {
+            'upvotes': forum.upvotes,
+            'downvotes': forum.downvotes,
+        }
