@@ -7,6 +7,8 @@ from pond.models import Pond
 from cycle.models import Cycle
 from cycle.repositories.cycle_repo import CycleRepo
 from user_profile.utils import get_supervisor
+from django.core.exceptions import ObjectDoesNotExist 
+from cycle.models import Cycle, PondFishAmount
 
 class FishDeathService:
     DATA_NOT_FOUND = "Data tidak ditemukan"
@@ -55,7 +57,7 @@ class FishDeathService:
 
         try:
             pond = self.repository.get_pond(pond_id)
-        except:
+        except ObjectDoesNotExist:
             raise HttpError(404, self.DATA_NOT_FOUND)
 
         if self.authorize_user(user, pond):
@@ -76,8 +78,29 @@ class FishDeathService:
         today = datetime.now().date()
         existing_fish_death = self.repository.get_existing_fish_death(cycle, pond, today)
 
+        latest = self.repository.get_latest_fish_death(pond, cycle)
+
+        pond_fish_amount = PondFishAmount.objects.get(pond=pond, cycle=cycle)
+        fish_seed = pond_fish_amount.fish_amount
+        current_alive = latest.fish_alive_count if latest else fish_seed
+
+        if payload.fish_death_count > current_alive:
+            raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({current_alive} ekor).")
+
         if existing_fish_death:
-            self.repository.delete_fish_death(existing_fish_death)
+            new_death_count = existing_fish_death.fish_death_count + payload.fish_death_count
+            new_alive_count = max(existing_fish_death.fish_alive_count - payload.fish_death_count, 0)
+
+            if new_death_count > fish_seed:
+                raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({fish_seed} ekor).")
+
+            existing_fish_death.fish_death_count = new_death_count
+            existing_fish_death.fish_alive_count = new_alive_count
+            existing_fish_death.save()
+            return existing_fish_death
+
+        # Jika belum ada catatan hari ini, buat baru
+        fish_alive = max(current_alive - payload.fish_death_count, 0)
 
         try:
             fish_death = self.repository.create_fish_death(
@@ -86,7 +109,7 @@ class FishDeathService:
                 cycle=cycle,
                 recorded_at=payload.recorded_at,
                 fish_death_count=payload.fish_death_count,
-                fish_alive_count=payload.fish_alive_count
+                fish_alive_count=fish_alive
             )
         except ValueError:
             raise HttpError(400, self.INVALID_FISH_DEATH_COUNT)

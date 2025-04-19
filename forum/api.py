@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
+from django.http import Http404
 
 router = Router()
 
@@ -29,18 +30,6 @@ def create_forum(request, data: ForumCreateSchema):
         parent=parent_forum
     )
     return new_forum
-@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
-def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
-    """
-    Endpoint untuk memperbarui deskripsi forum.
-    """
-    forum = ForumRepository.get_forum_by_id(forum_id)
-    
-    if request.user != forum.user:
-        return {"error": "You are not authorized to update this forum post."}, 403
-    
-    updated_forum = ForumRepository.update_forum(forum_id, data.description)
-    return updated_forum
 
 @router.post("/create_reply", response=ForumReplySchema, auth=JWTAuth())
 def create_reply(request, data: ForumCreateSchema):
@@ -62,6 +51,19 @@ def create_reply(request, data: ForumCreateSchema):
     )
     return reply
 
+@router.delete("/delete/{forum_id}", auth=JWTAuth())
+def delete_forum(request, forum_id: UUID):
+    try:
+        forum = ForumRepository.get_forum_by_id(forum_id)
+    except Http404:
+        return Response({"error": "Not Found."}, status=404)
+
+    if forum.user != request.user:
+        return Response({"error": "You are not authorized to delete this forum."}, status=403)
+
+    forum.delete()
+    return {"message": "Forum deleted successfully."}
+  
 @router.get("/get_by_id/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
 def get_forum_by_id(request, forum_id: UUID):
     try:
@@ -96,3 +98,16 @@ def get_replies(request, forum_id: UUID):
         return replies
     except Exception:
         return Response({"error": "Forum not found or invalid forum ID"}, status=404)
+
+@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
+def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
+    """
+    Endpoint untuk memperbarui deskripsi forum.
+    """
+    forum = ForumRepository.get_forum_by_id(forum_id)
+    
+    if request.user != forum.user:
+        return {"error": "You are not authorized to update this forum post."}, 403
+    
+    updated_forum = ForumRepository.update_forum(forum_id, data.description)
+    return updated_forum
