@@ -1,3 +1,4 @@
+import os
 from django.test import TestCase
 from django.contrib.auth.models import User
 from forum.models import Forum
@@ -8,17 +9,16 @@ from forum.schemas import (
     ForumUpdateSchema,
     UserSchema,
 )
-from datetime import datetime
-from uuid import uuid4  # In case you need to generate a uuid
 
 class ForumSchemaTest(TestCase):
     def setUp(self):
+        test_password = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
         self.user = User.objects.create_user(
             username='schema_user',
             first_name='Schema',
-            last_name='User'
+            last_name='User',
+            password=test_password
         )
-        self.user.set_password("testpass")
 
     def test_forum_create_schema(self):
         data = {"description": "Test forum create schema"}
@@ -54,12 +54,14 @@ class ForumSchemaTest(TestCase):
             "description": forum.description,
             "timestamp": forum.timestamp,
             "parent_id": None,
-            "replies": [{
+            "replies": [ {
                 "id": reply.id,
                 "user": user_schema_data,
                 "description": reply.description,
                 "timestamp": reply.timestamp,
-            }]
+            }],
+            "upvotes": 5,
+            "downvotes": 2
         }
         schema_instance = ForumOutputSchema(**forum_output_data)
         expected_user_dict = UserSchema(**user_schema_data).dict()
@@ -91,7 +93,6 @@ class ForumSchemaTest(TestCase):
 
     def test_forum_list_schema(self):
         """Test ForumListSchema with multiple forums"""
-        # Create two forum posts
         forum1 = Forum.objects.create(
             user=self.user,
             description="First forum"
@@ -114,10 +115,10 @@ class ForumSchemaTest(TestCase):
                 "user": user_data,
                 "description": forum1.description,
                 "timestamp": forum1.timestamp,
-                # Optionally include "parent_id" if needed:
                 "parent_id": None,
-                # And "replies" if you want to test replies in list output:
-                "replies": []
+                "replies": [],
+                "upvotes": 1, 
+                "downvotes": 0  
             },
             {
                 "id": forum2.id,
@@ -125,7 +126,9 @@ class ForumSchemaTest(TestCase):
                 "description": forum2.description,
                 "timestamp": forum2.timestamp,
                 "parent_id": None,
-                "replies": []
+                "replies": [],
+                "upvotes": 3,
+                "downvotes": 1
             }
         ]
         
@@ -133,3 +136,5 @@ class ForumSchemaTest(TestCase):
         self.assertEqual(len(list_schema.forums), 2)
         self.assertEqual(list_schema.forums[0].id, forum1.id)
         self.assertEqual(list_schema.forums[1].description, forum2.description)
+        self.assertEqual(list_schema.forums[0].upvotes, 1)
+        self.assertEqual(list_schema.forums[1].downvotes, 1)

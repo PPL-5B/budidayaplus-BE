@@ -3,10 +3,11 @@ from ninja import Router
 from ninja.responses import Response
 from uuid import UUID
 from django.contrib.auth.models import User
+from forum.models import ForumVote
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
-from django.http import Http404
+from django.http import Http404, HttpResponse, JsonResponse
 
 router = Router()
 
@@ -69,7 +70,7 @@ def get_forum_by_id(request, forum_id: UUID):
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)
         return forum
-    except Exception:
+    except Http404:
         return Response({"error": "Forum not found"}, status=404)
 
 @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
@@ -98,17 +99,58 @@ def get_replies(request, forum_id: UUID):
         return replies
     except Exception:
         return Response({"error": "Forum not found or invalid forum ID"}, status=404)
+    
+@router.get("/user_votes", auth=JWTAuth())
+def get_votes_by_user(request):
+    """
+    Mendapatkan semua vote yang diberikan oleh user yang sedang login.
+    """
+    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
 
-@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
+    votes = ForumVote.objects.filter(user=request.user).values("forum__id", "forum__description", "vote_choice")
+    return JsonResponse({"votes": list(votes)}, safe=False)
+
+@router.put("/{forum_id}", response={200: ForumOutputSchema, 403: dict, 404: dict}, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     """
     Endpoint untuk memperbarui deskripsi forum.
     """
-    forum = ForumRepository.get_forum_by_id(forum_id)
+    try:
+        forum = ForumRepository.get_forum_by_id(forum_id)
+    except Http404:
+        return Response({"error": "Forum not found"}, status=404)
     
     if request.user != forum.user:
-        return {"error": "You are not authorized to update this forum post."}, 403
+        return Response({"error": "You are not authorized to update this forum post."}, status=403)
     
     updated_forum = ForumRepository.update_forum(forum_id, data.description)
-    return updated_forum
+    return 200, updated_forum
+
+@router.post("/upvote/{forum_id}", auth=JWTAuth())
+def upvote_forum(request, forum_id: UUID):
+    forum = ForumRepository.get_forum_by_id(forum_id) 
+    ForumRepository.upvote_forum(request.user, forum)
+    return HttpResponse(status=204)
+
+@router.post("/downvote/{forum_id}", auth=JWTAuth())
+def downvote_forum(request, forum_id: UUID):
+    forum = ForumRepository.get_forum_by_id(forum_id)
+    ForumRepository.downvote_forum(request.user, forum)
+    return HttpResponse(status=204)
+
+@router.delete("/cancel_vote/{forum_id}", auth=JWTAuth())
+def cancel_vote(request, forum_id: UUID):
+    forum = ForumRepository.get_forum_by_id(forum_id)
+    ForumRepository.cancel_vote(request.user, forum)
+    return HttpResponse(status=204)
+
+@router.get("/vote_summary/{forum_id}", auth=JWTAuth())
+def vote_summary(request, forum_id: UUID):
+    forum = ForumRepository.get_forum_by_id(forum_id)
+    summary = ForumRepository.get_vote_summary(forum)
+    
+    user_vote = ForumVote.objects.filter(user=request.user, forum=forum).first()
+    summary["user_vote"] = user_vote.vote_choice if user_vote else None
+
+    return summary
 

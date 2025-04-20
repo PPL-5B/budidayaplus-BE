@@ -32,6 +32,8 @@ class ForumOutputSchema(Schema):
     timestamp: datetime
     parent_id: Optional[UUID4] = None
     replies: List[ForumReplySchema] = []
+    upvotes: int
+    downvotes: int
 
 class ForumListSchema(Schema):
     """
