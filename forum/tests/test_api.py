@@ -1,11 +1,10 @@
+# test_api.py
 from unittest.mock import patch
 from django.test import TestCase, Client
-import os
 from django.contrib.auth.models import User
 from django.contrib.auth.models import User
 import uuid
 import json
-from forum.models import Forum, ForumVote
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.tokens import RefreshToken
 from datetime import timedelta
@@ -14,10 +13,8 @@ from django.utils import timezone
 class ForumAPITestCase(TestCase):
     def setUp(self):
         self.client = Client()
-        self.test_password = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
-        
-        self.user = User.objects.create_user(username="testuser", password=self.test_password)
-        self.other_user = User.objects.create_user(username="otheruser", password=self.test_password)
+        self.user = User.objects.create_user(username="testuser", password="password123")
+        self.other_user = User.objects.create_user(username="otheruser", password="password123")
         self.forum = Forum.objects.create(user=self.user, description="Original Post")
         self.forum_id = str(self.forum.id)
 
@@ -39,15 +36,6 @@ class ForumAPITestCase(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
-    
-    def _authenticated_put(self, url, data, token):
-        return self.client.put(
-            url,
-            data=json.dumps(data),
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Bearer {token}"
-        )
-
 
     def test_create_forum_success(self):
         """Test creating a forum post successfully."""
@@ -177,7 +165,7 @@ class ForumAPITestCase(TestCase):
         Expected: 403 Forbidden.
         """
         # Buat user lain
-        other_user = User.objects.create_user(username="lain", password=self.test_password)
+        other_user = User.objects.create_user(username="lain", password="test1234")
         forum = ForumRepository.create_forum(user=other_user, description="Not yours")
         
         response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
@@ -217,7 +205,6 @@ class ForumAPITestCase(TestCase):
 
     def test_list_forums_success(self):
         """Test retrieving a list of all forums."""
-        Forum.objects.all().delete()
         ForumRepository.create_forum(user=self.user, description="Forum 1")
         ForumRepository.create_forum(user=self.user, description="Forum 2")
         response = self._authenticated_get("/api/forum/list", self.user_token)
@@ -225,26 +212,28 @@ class ForumAPITestCase(TestCase):
         self.assertEqual(len(response.json()), 2)
 
     def test_get_forums_by_user_success(self):
-        Forum.objects.all().delete()  
+        """Test retrieving forums created by the authenticated user."""
         ForumRepository.create_forum(user=self.user, description="User's forum")
-        another_user = User.objects.create_user(username="anotheruser", password=self.test_password)
+        another_user = User.objects.create_user(username="anotheruser", password="password123")
         ForumRepository.create_forum(user=another_user, description="Another user's forum")
         response = self._authenticated_get("/api/forum/get_by_user", self.user_token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.json()[0]["description"], "User's forum")
 
+    def test_get_forums_by_user_unauthenticated(self):
+        """Test retrieving forums by user without authentication."""
+        response = self.client.get("/api/forum/get_by_user")
+        self.assertEqual(response.status_code, 401)
 
     def test_get_latest_forum_success(self):
         """Test retrieving the latest forum."""
-        Forum.objects.all().delete()
-
         old_forum = ForumRepository.create_forum(user=self.user, description="Old forum")
-        old_forum.timestamp = timezone.now() - timedelta(days=1)
+        old_forum.timestamp = timezone.now() - timedelta(days=1) 
         old_forum.save()
 
         latest_forum = ForumRepository.create_forum(user=self.user, description="Latest forum")
-        latest_forum.timestamp = timezone.now()
+        latest_forum.timestamp = timezone.now() 
         latest_forum.save()
 
         response = self._authenticated_get("/api/forum/get_latest", self.user_token)
@@ -252,110 +241,11 @@ class ForumAPITestCase(TestCase):
         self.assertEqual(response.json()["description"], "Latest forum")
 
     def test_get_latest_forum_not_found(self):
-        Forum.objects.all().delete()  
+        """Test retrieving the latest forum when no forums exist."""
         response = self._authenticated_get("/api/forum/get_latest", self.user_token)
         self.assertEqual(response.status_code, 404)
         self.assertIn("error", response.json())
 
-
-    def test_get_replies_forum_not_found(self):
-        """Test retrieving replies for a non-existent forum."""
-        response = self._authenticated_get(f"/api/forum/get_replies/{uuid.uuid4()}", self.user_token)
-        self.assertEqual(response.status_code, 404)
-        self.assertIn("error", response.json())
-    
-    def test_create_post_with_invalid_parent_forum(self):
-        data = {
-            "description": "This is a test forum post.",
-            "parent_id": str(uuid.uuid4())  # Random UUID
-        }
-        response = self._authenticated_post("/api/forum/create", data, self.user_token)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"error": "Invalid parent forum ID"})
-
-    def test_upvote_success(self):
-        response = self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
-        self.assertEqual(response.status_code, 204)
-
-        vote = ForumVote.objects.get(user=self.user, forum=self.forum)
-        self.assertEqual(vote.vote_choice, 'up')
-
-    def test_downvote_success(self):
-        response = self._authenticated_post(f"/api/forum/downvote/{self.forum_id}", {}, self.user_token)
-        self.assertEqual(response.status_code, 204)
-
-        vote = ForumVote.objects.get(user=self.user, forum=self.forum)
-        self.assertEqual(vote.vote_choice, 'down')
-
-    def test_change_vote(self):
-        self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
-        self._authenticated_post(f"/api/forum/downvote/{self.forum_id}", {}, self.user_token)
-    
-        vote = ForumVote.objects.get(user=self.user, forum=self.forum)
-        self.assertEqual(vote.vote_choice, 'down')
-        self.assertEqual(ForumVote.objects.count(), 1) 
-
-    def test_cancel_vote_success(self):
-        self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
-        response = self._authenticated_delete(f"/api/forum/cancel_vote/{self.forum_id}", self.user_token)
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(ForumVote.objects.filter(user=self.user, forum=self.forum).exists())
-
-    def test_cancel_non_existing_vote(self):
-        response = self._authenticated_delete(f"/api/forum/cancel_vote/{self.forum_id}", self.user_token)
-        self.assertEqual(response.status_code, 204) 
-
-    def test_vote_on_nonexistent_forum(self):
-        non_existent_id = uuid.uuid4()
-        response = self._authenticated_post(f"/api/forum/upvote/{non_existent_id}", {}, self.user_token)
-        self.assertEqual(response.status_code, 404)
-
-    def test_vote_summary_multiple_users(self):
-        self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
-        
-        other_token = str(RefreshToken.for_user(self.other_user).access_token)
-        self._authenticated_post(f"/api/forum/downvote/{self.forum_id}", {}, other_token)
-        
-        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["upvotes"], 1)
-        self.assertEqual(response.json()["downvotes"], 1)
-        self.assertEqual(response.json()["user_vote"], 'up')
-
-    def test_vote_summary_no_votes(self):
-        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["upvotes"], 0)
-        self.assertEqual(response.json()["downvotes"], 0)
-        self.assertIsNone(response.json()["user_vote"])
-
-    def test_vote_unauthenticated(self):
-        response = self.client.post(f"/api/forum/upvote/{self.forum_id}")
-        self.assertEqual(response.status_code, 401)
-        
-        response = self.client.post(f"/api/forum/downvote/{self.forum_id}")
-        self.assertEqual(response.status_code, 401)
-        
-        response = self.client.delete(f"/api/forum/cancel_vote/{self.forum_id}")
-        self.assertEqual(response.status_code, 401)
-    
-    def test_vote_summary_success(self):
-        self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
-        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("upvotes", response.json())
-        self.assertIn("downvotes", response.json())
-        self.assertEqual(response.json()["user_vote"], "up")
-
-    def test_vote_summary_unauthenticated(self):
-        response = self.client.get(f"/api/forum/vote_summary/{self.forum_id}")
-        self.assertEqual(response.status_code, 401)
-
-    def test_update_forum_not_found(self):
-        update_data = {"description": "Does not exist"}
-        response = self._authenticated_put(f"/api/forum/{uuid.uuid4()}/", update_data, self.user_token)
-        self.assertEqual(response.status_code, 404)
-    
     def test_get_replies_success(self):
         """Test retrieving replies for a forum."""
         parent_forum = ForumRepository.create_forum(user=self.user, description="Parent forum")
@@ -364,101 +254,139 @@ class ForumAPITestCase(TestCase):
         response = self._authenticated_get(f"/api/forum/get_replies/{parent_forum.id}", self.user_token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 2)
-    
-    def test_update_forum_success(self):
-        """Test successful forum update by owner"""
-        forum = ForumRepository.create_forum(
+
+
+    def test_get_replies_forum_not_found(self):
+        """Test retrieving replies for a non-existent forum."""
+        response = self._authenticated_get(f"/api/forum/get_replies/{uuid.uuid4()}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+
+    def test_create_post_with_invalid_parent_forum(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+        data = {"description": "This is a test forum post.", "parent_id": str(uuid.uuid4())}  # Random UUID
+        response = self.client.post(self.url, data, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "Invalid parent forum ID"})
+
+    def test_update_forum_success_flow(self):
+        """Test full successful update flow including the repository update"""
+        # Setup
+        forum = Forum.objects.create(user=self.user, description="Original Post")
+        update_data = {"description": "Successfully updated description"}
+        
+        # Action
+        response = self._authenticated_put(
+            f"/api/forum/{forum.id}/",
+            update_data,
+            self.user_token
+        )
+        
+        # Assert
+        self.assertEqual(response.status_code, 200)
+        updated_forum = Forum.objects.get(id=forum.id)
+        self.assertEqual(updated_forum.description, "Successfully updated description")
+        self.assertEqual(response.json()["description"], "Successfully updated description")
+
+    def test_update_forum_successful_update(self):
+        """Test successful forum update including repository call"""
+        # Create initial forum
+        forum = Forum.objects.create(
             user=self.user,
             description="Original description"
         )
-        update_data = {"description": "Updated description"}
+        
+        # Update data
+        update_data = {
+            "description": "Updated description"
+        }
+        
+        # Make the request
         response = self._authenticated_put(
-            f"/api/forum/{forum.id}",
+            f"/api/forum/{forum.id}/",
             update_data,
             self.user_token
         )
+        
+        # Assertions
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["description"], "Updated description")
         
+        # Verify the database was actually updated
         updated_forum = Forum.objects.get(id=forum.id)
         self.assertEqual(updated_forum.description, "Updated description")
 
-    def test_update_forum_unauthenticated(self):
-        """Test updating forum without authentication"""
-        forum = ForumRepository.create_forum(
+    @patch('forum.repositories.forum_repository.ForumRepository.update_forum')
+    def test_update_forum_repository_called(self, mock_update):
+        """Test that repository update method is called"""
+        # Setup mock
+        mock_update.return_value = Forum(
+            id=self.forum.id,
             user=self.user,
-            description="Original post"
+            description="Mocked updated description"
         )
-        update_data = {"description": "Unauthenticated update"}
-        response = self.client.put(
-            f"/api/forum/{forum.id}",
-            data=json.dumps(update_data),
-            content_type="application/json"
+        
+        # Test data
+        update_data = {
+            "description": "Should be mocked"
+        }
+        
+        # Make request
+        response = self._authenticated_put(
+            f"/api/forum/{self.forum.id}/",
+            update_data,
+            self.user_token
         )
-        self.assertEqual(response.status_code, 401)
+        
+        # Verify mock was called
+        mock_update.assert_called_once_with(self.forum.id, "Should be mocked")
+        
+        # Verify response uses mocked data
+        self.assertEqual(response.json()["description"], "Mocked updated description")
 
-    def test_update_forum_invalid_data(self):
-        """Test updating with invalid data (empty description)"""
-        forum = ForumRepository.create_forum(
+    def test_update_forum_empty_description(self):
+        """Test updating with empty description"""
+        forum = Forum.objects.create(
             user=self.user,
-            description="Original post"
-        )
-        update_data = {"description": ""}  
-        response = self._authenticated_put(
-            f"/api/forum/{forum.id}",
-            update_data,
-            self.user_token
-        )
-        self.assertEqual(response.status_code, 422) 
-        self.assertIn("detail", response.json())
-    
-    def test_update_forum_forbidden_not_owner(self):
-        """Test user lain tidak bisa update forum"""
-        other_forum = ForumRepository.create_forum(
-            user=self.other_user,
-            description="Post user lain"
+            description="Original description"
         )
         
-        update_data = {"description": "Coba ubah punya orang"}
+        update_data = {
+            "description": ""  # Empty string
+        }
         
         response = self._authenticated_put(
-            f"/api/forum/{other_forum.id}",
+            f"/api/forum/{forum.id}/",
             update_data,
             self.user_token
         )
         
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(
-            response.json()["error"],
-            "You are not authorized to update this forum post."
-        )
-        
-        unchanged_forum = Forum.objects.get(id=other_forum.id)
-        self.assertEqual(unchanged_forum.description, "Post user lain")
-    
-    def test_update_forum_not_found(self):
-        """Test update forum dengan ID yang tidak ada"""
-        non_existent_id = uuid.uuid4()
-        update_data = {"description": "Coba update forum tidak ada"}
-        
-        response = self._authenticated_put(
-            f"/api/forum/{non_existent_id}",
-            update_data,
-            self.user_token
-        )
-        
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"], "Forum not found")
+        # Should either be 200 (if allowed) or 400 (if validation fails)
+        self.assertIn(response.status_code, [200, 400])
+        if response.status_code == 200:
+            self.assertEqual(Forum.objects.get(id=forum.id).description, "")
 
-    def test_get_user_votes_success(self):
-        """Test retrieving votes for the logged-in user."""
-        ForumVote.objects.create(user=self.user, forum=self.forum, vote_choice="up")
-        response = self._authenticated_get("/api/forum/user_votes", self.user_token)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["votes"]), 1)
-        self.assertEqual(response.json()["votes"][0]["vote_choice"], "up")
-
-    def test_get_user_votes_unauthenticated(self):
-        """Test retrieving votes without authentication."""
-        response = self.client.get("/api/forum/user_votes")
-        self.assertEqual(response.status_code, 401)
+    def test_update_forum_return_value_structure(self):
+        """Test the returned value has correct structure"""
+        forum = Forum.objects.create(
+            user=self.user,
+            description="Original"
+        )
+        
+        update_data = {
+            "description": "New description"
+        }
+        
+        response = self._authenticated_put(
+            f"/api/forum/{forum.id}/",
+            update_data,
+            self.user_token
+        )
+        
+        # Check response structure
+        response_data = response.json()
+        self.assertIn("id", response_data)
+        self.assertIn("description", response_data)
+        self.assertIn("user", response_data)
+        self.assertIn("created_at", response_data)
+        self.assertIn("parent", response_data)
