@@ -262,4 +262,16 @@ class ForumAPITestCase(TestCase):
         fake_request = SimpleNamespace(user=self.user)
         result = get_forum_by_id(fake_request, uuid.UUID(self.post_id))
         self.assertEqual(result.id, uuid.UUID(self.post_id))
-
+        
+    def test_get_user_votes_success(self):
+         """Test retrieving votes for the logged-in user."""
+         ForumVote.objects.create(user=self.user, forum=self.forum, vote_choice="up")
+         response = self._authenticated_get("/api/forum/user_votes", self.user_token)
+         self.assertEqual(response.status_code, 200)
+         self.assertEqual(len(response.json()["votes"]), 1)
+         self.assertEqual(response.json()["votes"][0]["vote_choice"], "up")
+ 
+    def test_get_user_votes_unauthenticated(self):
+         """Test retrieving votes without authentication."""
+         response = self.client.get("/api/forum/user_votes")
+         self.assertEqual(response.status_code, 401)
