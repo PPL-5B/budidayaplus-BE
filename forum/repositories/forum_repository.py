@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import Optional, List
 from django.shortcuts import get_object_or_404
-from forum.models import Forum, ForumVote
+from forum.models import Forum
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -39,6 +39,7 @@ class ForumRepository:
     
     @staticmethod
     def get_replies(forum: Forum) -> List[Forum]:
+        # Returns all replies for a given forum post.
         return list(forum.replies.all())
         
     @staticmethod
@@ -47,30 +48,3 @@ class ForumRepository:
         forum.description = description
         forum.save()
         return forum
-    
-    @staticmethod
-    def upvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'up'}
-        )
-    
-    @staticmethod
-    def downvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'down'}
-        )
-
-    @staticmethod
-    def cancel_vote(user: User, forum: Forum):
-        ForumVote.objects.filter(user=user, forum=forum).delete()
-
-    @staticmethod
-    def get_vote_summary(forum: Forum) -> dict:
-        return {
-            'upvotes': forum.upvotes,
-            'downvotes': forum.downvotes,
-        }
