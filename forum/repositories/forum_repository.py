@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from forum.models import Forum, ForumVote
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
 
 
 class ForumRepository:
@@ -87,3 +88,14 @@ class ForumRepository:
             'upvotes': forum.upvotes,
             'downvotes': forum.downvotes,
         }
+
+    @staticmethod
+    def search_forums(query: str) -> List[Forum]:
+        """
+        Search forums by title and description
+        """
+        return Forum.objects.filter(
+            models.Q(title__icontains=query) | 
+            models.Q(description__icontains=query),
+            parent__isnull=True  
+        ).order_by('-timestamp')

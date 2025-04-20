@@ -8,6 +8,7 @@ from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchem
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
 from django.http import Http404, HttpResponse, JsonResponse
+from ninja import Query
 
 router = Router()
 
@@ -155,3 +156,11 @@ def vote_summary(request, forum_id: UUID):
     summary["user_vote"] = user_vote.vote_choice if user_vote else None
 
     return summary
+
+@router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
+def search_forums(request, query: str = Query(..., description="Search query")):
+    if not query.strip():
+        return Response({"error": "Search query cannot be empty"}, status=400)
+    
+    results = ForumRepository.search_forums(query)
+    return results
