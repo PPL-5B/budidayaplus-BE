@@ -275,3 +275,27 @@ class ForumAPITestCase(TestCase):
          """Test retrieving votes without authentication."""
          response = self.client.get("/api/forum/user_votes")
          self.assertEqual(response.status_code, 401)
+
+    def test_search_forum_success_and_empty(self):
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Diskusi Django",
+            description="Pembahasan tentang framework Django"
+        )
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Belajar Machine Learning",
+            description="Topik pembelajaran ML dari dasar"
+        )
+
+        response = self._req("GET", "/api/forum/search?q=django", self.token)
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(any("django" in f["title"].lower() for f in result))
+
+        response_not_found = self._req("GET", "/api/forum/search?q=tidakada", self.token)
+        self.assertEqual(response_not_found.status_code, 200)
+        self.assertEqual(len(response_not_found.json()), 0)
+
+        response_no_query = self._req("GET", "/api/forum/search", self.token)
+        self.assertEqual(response_no_query.status_code, 400)
