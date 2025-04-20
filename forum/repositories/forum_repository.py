@@ -22,10 +22,15 @@ class ForumRepository:
     def delete_forum(forum: Forum):
         forum.delete()
 
-    @staticmethod
-    def list_forums() -> List[Forum]:
-        return Forum.objects.all()
+    # @staticmethod
+    # def list_forums() -> List[Forum]:
+    #     return Forum.objects.all()
 
+    @staticmethod
+    def list_forums(limit=20, offset=0):
+        return Forum.objects.select_related("user") \
+            .order_by("-timestamp")[offset:offset + limit]
+    
     @staticmethod
     def get_forums_by_user(user: User) -> List[Forum]:
         return Forum.objects.filter(user=user)

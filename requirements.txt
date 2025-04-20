@@ -10,3 +10,4 @@ Django
 django-cors-headers
 django-stubs
 sentry-sdk[django]
+django-silk
