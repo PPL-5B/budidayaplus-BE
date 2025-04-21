@@ -301,6 +301,52 @@ class ForumAPITestCase(TestCase):
         self.assertEqual(response_no_query.status_code, 400)
 
     def test_search_forums_empty_query(self):
-        response = self.client.get("/api/forum/search", {"query": "   "}, **self.auth_headers)
+        """Test search with empty query returns 400"""
+        response = self._req("GET", "/api/forum/search?q=", self.token)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {"error": "Search query cannot be empty"})
+
+    def test_search_forums_with_whitespace_query(self):
+        """Test search with whitespace-only query returns 400"""
+        response = self._req("GET", "/api/forum/search?q=   ", self.token)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "Search query cannot be empty"})
+
+    def test_search_forums_success(self):
+        """Test successful search with results"""
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Django Testing",
+            description="Unit testing in Django"
+        )
+        
+        response = self._req("GET", "/api/forum/search?q=django", self.token)
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.json()), 0)
+        self.assertTrue(any("django" in f["title"].lower() for f in response.json()))
+
+    def test_search_forums_no_results(self):
+        """Test search with no matching results"""
+        response = self._req("GET", "/api/forum/search?q=nonexistentterm", self.token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 0)
+
+    def test_get_user_votes_authenticated(self):
+        """Test that authenticated user can get their votes"""
+        ForumVote.objects.create(
+            user=self.user,
+            forum=self.post,
+            vote_choice="up"
+        )
+
+        response = self._req("GET", "/api/forum/user_votes", self.token)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["votes"]), 1)
+        self.assertEqual(response.json()["votes"][0]["vote_choice"], "up")
+        self.assertEqual(response.json()["votes"][0]["forum__id"], str(self.post.id))
+
+    def test_get_user_votes_unauthenticated(self):
+        """Test that unauthenticated user gets 401"""
+        response = self._req("GET", "/api/forum/user_votes")
+        self.assertEqual(response.status_code, 401)
