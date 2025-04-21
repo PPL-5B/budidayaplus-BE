@@ -14,6 +14,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from user_profile.utils import get_supervisor
 from threshold.utils import validate_pond_quality_against_threshold
 from silk.profiling.profiler import silk_profile
+from pond_quality.services import get_pond_qualities_for_response, fetch_latest_pond_quality
+
 
 
 DATA_NOT_FOUND = "Data tidak ditemukan"
@@ -35,10 +37,11 @@ def list_pond_quality(request, pond_id: str):
 
     check_cycle_active(cycle)
 
-    pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond)
+    pond_qualities = get_pond_qualities_for_response(cycle, pond)
+
 
     return {
-        "pond_qualities": pond_quality,
+        "pond_qualities": pond_qualities,
         "cycle_id": cycle.id
     }
 
@@ -102,7 +105,7 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
     check_cycle_active(cycle)
 
     try:
-        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).select_related('reporter').latest('recorded_at')
+        pond_quality = fetch_latest_pond_quality(cycle, pond)
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
 
