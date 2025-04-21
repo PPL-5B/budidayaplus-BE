@@ -94,3 +94,28 @@ class ForumRepositoryTest(TestCase):
         self.assertFalse(
             ForumVote.objects.filter(user=self.user, forum=self.f1).exists()
         )
+
+    # ---------- search ----------
+    def test_search_forums(self):
+        special_forum = ForumRepository.create_forum(
+            user=self.other,
+            title="Diskusi tentang Django",
+            description="Belajar Django dari dasar",
+        )
+
+        self.assertIsNone(special_forum.parent)
+
+        result_by_title = ForumRepository.search_forums("Django")
+        self.assertIn(special_forum, result_by_title)
+
+        result_by_description = ForumRepository.search_forums("dasar")
+        self.assertIn(special_forum, result_by_description)
+
+        reply = ForumRepository.create_forum(
+            user=self.other,
+            title="",
+            description="Balasan",
+            parent=self.f1,
+        )
+        search_result = ForumRepository.search_forums("Balasan")
+        self.assertNotIn(reply, search_result)

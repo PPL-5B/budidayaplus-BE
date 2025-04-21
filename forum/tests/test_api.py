@@ -299,3 +299,8 @@ class ForumAPITestCase(TestCase):
 
         response_no_query = self._req("GET", "/api/forum/search", self.token)
         self.assertEqual(response_no_query.status_code, 400)
+
+    def test_search_forums_empty_query(self):
+        response = self.client.get("/api/forum/search", {"query": "   "}, **self.auth_headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "Search query cannot be empty"})
