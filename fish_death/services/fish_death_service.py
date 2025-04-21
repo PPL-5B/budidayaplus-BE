@@ -9,6 +9,7 @@ from cycle.repositories.cycle_repo import CycleRepo
 from user_profile.utils import get_supervisor
 from django.core.exceptions import ObjectDoesNotExist 
 from cycle.models import Cycle, PondFishAmount
+from django.contrib.auth.models import User
 
 class FishDeathService:
     DATA_NOT_FOUND = "Data tidak ditemukan"
@@ -40,6 +41,7 @@ class FishDeathService:
         self.authorize_user(user, pond)
         return fish_death
 
+    
     def get_latest_fish_death(self, cycle_id: str, pond_id: str, user) -> FishDeath:
         cycle = self.repository.get_cycle(cycle_id)
         pond = self.repository.get_pond(pond_id)
@@ -71,16 +73,12 @@ class FishDeathService:
             'cycle_id': cycle.id
         }
 
-    def create_fish_death(self, pond_id: str, cycle_id: str, reporter_id: int, payload: FishDeathCreateSchema) -> FishDeath:
-        pond = self.repository.get_pond(pond_id)
-        reporter = self.repository.get_reporter(reporter_id)
-        cycle = self.repository.get_cycle(cycle_id)
+    def create_fish_death(self, pond: Pond, cycle: Cycle, reporter: User, payload: FishDeathCreateSchema) -> FishDeath:
         today = datetime.now().date()
         existing_fish_death = self.repository.get_existing_fish_death(cycle, pond, today)
-
         latest = self.repository.get_latest_fish_death(pond, cycle)
 
-        pond_fish_amount = PondFishAmount.objects.get(pond=pond, cycle=cycle)
+        pond_fish_amount = PondFishAmount.objects.only("fish_amount").get(pond=pond, cycle=cycle)
         fish_seed = pond_fish_amount.fish_amount
         current_alive = latest.fish_alive_count if latest else fish_seed
 
@@ -94,14 +92,13 @@ class FishDeathService:
             if new_death_count > fish_seed:
                 raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({fish_seed} ekor).")
 
-            existing_fish_death.fish_death_count = new_death_count
-            existing_fish_death.fish_alive_count = new_alive_count
-            existing_fish_death.save()
-            return existing_fish_death
+            FishDeath.objects.filter(id=existing_fish_death.id).update(
+                fish_death_count=new_death_count,
+                fish_alive_count=new_alive_count
+            )
+            return FishDeath.objects.get(id=existing_fish_death.id) 
 
-        # Jika belum ada catatan hari ini, buat baru
         fish_alive = max(current_alive - payload.fish_death_count, 0)
-
         try:
             fish_death = self.repository.create_fish_death(
                 pond=pond,
