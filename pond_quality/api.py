@@ -13,6 +13,8 @@ from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
 from user_profile.utils import get_supervisor
 from threshold.utils import validate_pond_quality_against_threshold
+from silk.profiling.profiler import silk_profile
+
 
 DATA_NOT_FOUND = "Data tidak ditemukan"
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
@@ -25,6 +27,7 @@ def check_cycle_active(cycle):
     if not (cycle.start_date <= today <= cycle.end_date):
         raise HttpError(400, CYCLE_NOT_ACTIVE)
 
+@silk_profile(name="List Pond Quality")
 @router.get("/{pond_id}/", auth=JWTAuth(), response={200: PondQualityHistory})
 def list_pond_quality(request, pond_id: str):
     cycle = CycleService.get_active_cycle(request.auth)
@@ -39,6 +42,7 @@ def list_pond_quality(request, pond_id: str):
         "cycle_id": cycle.id
     }
 
+@silk_profile(name="Add Pond Quality")
 @router.post("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityInput):
     supervisor = get_supervisor(user=request.auth)
@@ -62,6 +66,7 @@ def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityI
     return pond_quality
 
 
+@silk_profile(name="Get Pond Quality Data")
 @router.get("/{cycle_id}/{pond_id}/{pond_quality_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
@@ -83,6 +88,7 @@ def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str)
     return pond_quality
 
 
+@silk_profile(name="Get Latest Pond Quality")
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
     cycle = get_object_or_404(Cycle, id=cycle_id)
@@ -102,6 +108,7 @@ def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
 
     return pond_quality
 
+@silk_profile(name="Fetch Dashboard Table Data")
 def fetch_dashboard_table_data(cycle, pond):
     #Helper function untuk mengambil data dashboar
     try:
@@ -126,6 +133,7 @@ def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
 
     return fetch_dashboard_table_data(cycle, pond)
 
+@silk_profile(name="Pond Quality Alerts")
 @router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
 def get_pond_quality_alerts(request, pond_id: str):
     user = request.auth
