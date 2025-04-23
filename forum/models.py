@@ -3,10 +3,18 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Forum(models.Model):
+    TAG_CHOICES = (
+        ('ikan', 'Ikan'),
+        ('kolam', 'Kolam'),
+        ('siklus', 'Siklus'),
+        ('budidayaplus', 'BudidayaPlus'),
+    )
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=255, blank=True, default="")
     description = models.TextField()
+    tag = models.CharField(max_length=12, choices=TAG_CHOICES, default='ikan')
     timestamp = models.DateTimeField(auto_now_add=True)
     parent = models.ForeignKey(
         'self',

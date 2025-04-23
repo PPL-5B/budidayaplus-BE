@@ -26,22 +26,27 @@ class ForumSchemaTest(TestCase):
         main = ForumCreateSchema(
             title="Judul",
             description="Deskripsi",
+            tag="ikan"
         )
         self.assertEqual(main.title, "Judul")
+        self.assertEqual(main.tag, "ikan")
         self.assertIsNone(main.parent_id)
 
         pid = uuid4()
-        reply = ForumCreateSchema(description="Balasan", parent_id=pid)
+        reply = ForumCreateSchema(description="Balasan", parent_id=pid, tag="kolam")
         self.assertIsNone(reply.title)
         self.assertEqual(str(reply.parent_id), str(pid))
+        self.assertEqual(reply.tag, "kolam")
 
     # ------------ ForumUpdateSchema ------------
     def test_update_schema_validation(self):
-        ok = ForumUpdateSchema(title="Baru", description="Ubah")
+        ok = ForumUpdateSchema(title="Baru", description="Ubah", tag="siklus")
         self.assertEqual(ok.description, "Ubah")
+        self.assertEqual(ok.tag, "siklus")
 
         # None boleh
         self.assertIsNone(ForumUpdateSchema().title)
+        self.assertIsNone(ForumUpdateSchema().tag)
 
         # String kosong → error
         with self.assertRaises(ValueError):
@@ -52,13 +57,14 @@ class ForumSchemaTest(TestCase):
     # ------------ ForumOutputSchema & List ------------
     def test_output_and_list_schema(self):
         post = Forum.objects.create(
-            user=self.user, title="Judul", description="Isi"
+            user=self.user, title="Judul", description="Isi", tag="ikan"
         )
         reply = Forum.objects.create(
             user=self.user,
             title="Reply Judul Forum",
             description="Balasan",
             parent=post,
+            tag="kolam"
         )
 
         udata = {
@@ -73,6 +79,7 @@ class ForumSchemaTest(TestCase):
             "user": udata,
             "title": post.title,
             "description": post.description,
+            "tag": post.tag,
             "timestamp": post.timestamp,
             "parent_id": None,
             "replies": [
@@ -81,6 +88,7 @@ class ForumSchemaTest(TestCase):
                     "user": udata,
                     "title": reply.title,
                     "description": reply.description,
+                    "tag": reply.tag,
                     "timestamp": reply.timestamp,
                 }
             ],
@@ -89,6 +97,8 @@ class ForumSchemaTest(TestCase):
         }
         out = ForumOutputSchema(**payload)
         self.assertEqual(out.replies[0].title, "Reply Judul Forum")
+        self.assertEqual(out.tag, "ikan")
+        self.assertEqual(out.replies[0].tag, "kolam")
 
         # List
         lst = ForumListSchema(forums=[payload])
