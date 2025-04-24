@@ -20,12 +20,18 @@ def login(request, data: LoginSchema):
 
         print('tes')
         refresh = RefreshToken.for_user(user)
-        print('access token:' + str(refresh.access_token))
-        return {
+        new_access_token = str(refresh.access_token)
+
+        print('access token:' + new_access_token)
+
+        response = {
             "message": "Login berhasil",
-            "access": str(refresh.access_token),
+            "access": new_access_token,
             "refresh": str(refresh),
+            "tes": "123"
         }
+
+        return response
     
 
     except User.DoesNotExist:
