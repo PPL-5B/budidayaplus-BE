@@ -287,7 +287,7 @@ class ForumAPITestCase(TestCase):
 
     def test_get_replies_success(self):
         """Test retrieving replies for a forum."""
-        reply = ForumRepository.create_forum(
+        ForumRepository.create_forum(
             user=self.user,
             title="Reply Title",
             description="Reply content",
