@@ -250,6 +250,41 @@ class ForumAPITestCase(TestCase):
         self.assertIn("error", response.json())
         self.assertEqual(response.json()["error"], "No forums available.")
 
+    def test_get_forums_by_tag_api_success(self):
+        """Test the API endpoint for getting forums by tag."""
+        # Create another forum with 'ikan' tag for testing multiple results
+        ForumRepository.create_forum(
+            user=self.other_user,
+            title="Another Ikan Forum",
+            description="Another post about fish",
+            tag="ikan"
+        )
+        
+        response = self._authenticated_get("/api/forum/get_by_tag/ikan", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        forums = response.json()
+        self.assertEqual(len(forums), 2)
+        self.assertTrue(all(forum["tag"] == "ikan" for forum in forums))
+
+    def test_get_forums_by_tag_api_no_results(self):
+        """Test the API endpoint for getting forums by tag when none exist."""
+        response = self._authenticated_get("/api/forum/get_by_tag/budidayaplus", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        forums = response.json()
+        self.assertEqual(len(forums), 0)
+        
+    def test_get_forums_by_tag_api_invalid_tag(self):
+        """Test the API endpoint with an invalid tag."""
+        response = self._authenticated_get("/api/forum/get_by_tag/invalid_tag", self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        self.assertTrue("Invalid tag" in response.json()["error"])
+
+    def test_get_forums_by_tag_api_unauthenticated(self):
+        """Test the API endpoint without authentication."""
+        response = self.client.get("/api/forum/get_by_tag/ikan")
+        self.assertEqual(response.status_code, 401)
+
     def test_get_replies_success(self):
         """Test retrieving replies for a forum."""
         reply = ForumRepository.create_forum(
