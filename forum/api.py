@@ -1,5 +1,5 @@
 from typing import List
-from ninja import Router
+from ninja import Router, Query
 from ninja.responses import Response
 from uuid import UUID
 from django.contrib.auth.models import User
@@ -8,6 +8,8 @@ from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchem
 from forum.repositories.forum_repository import ForumRepository
 from forum.models import Forum
 from ninja_jwt.authentication import JWTAuth
+from django.http import Http404
+from silk.profiling.profiler import silk_profile
 from django.http import Http404, HttpResponse
 
 router = Router()
@@ -77,9 +79,33 @@ def get_forum_by_id(request, forum_id: UUID):
     except Http404:
         return Response({"error": "Forum not found"}, status=404)
 
+# @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
+# @silk_profile(name="forum_api:list_forums")
+# def get_list_forums(request):
+#     # Gunakan profiling terpisah untuk query database
+#     with silk_profile(name="forum_api:db_query"):
+#         forums = ForumRepository.list_forums()
+    
+#     # Profiling untuk pemrosesan data setelah query (jika ada)
+#     with silk_profile(name="forum_api:post_processing"):
+#         # Jika ada pemrosesan data tambahan, letakkan di sini
+#         pass
+        
+#     return forums
+
 @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
-def get_list_forums(request):
-    forums = ForumRepository.list_forums()
+@silk_profile(name="forum_api:list_forums")
+def get_list_forums(request, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+    """
+    Endpoint untuk mengambil daftar forum dengan pagination dan optimisasi query.
+    """
+    with silk_profile(name="forum_api:db_query"):
+        forums = ForumRepository.list_forums(limit=limit, offset=offset)
+
+    # Optional: post processing bisa dilakukan di sini kalau butuh
+    with silk_profile(name="forum_api:post_processing"):
+        pass
+
     return forums
 
 @router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
