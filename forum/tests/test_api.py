@@ -11,15 +11,19 @@ from types import SimpleNamespace
 
 from django.test import TestCase, Client
 from django.utils import timezone
-
+from django.contrib.auth.models import User, AnonymousUser
+from ninja_jwt.tokens import RefreshToken
+from ninja.responses import Response
+from forum.models import Forum, ForumVote
+from forum.repositories.forum_repository import ForumRepository
+from forum.api import create_forum, get_forums_by_user, get_forum_by_id
+from forum.schemas import ForumCreateSchema
 from types import SimpleNamespace
-from django.contrib.auth.models import AnonymousUser
 from forum.api import create_forum, get_forums_by_user
 from forum.schemas import ForumCreateSchema
 from types import SimpleNamespace
 from forum.api import get_replies
 from forum.models import Forum
-
 
 class ForumAPITestCase(TestCase):
     def _token(self, user: User):
@@ -98,6 +102,23 @@ class ForumAPITestCase(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
+        self.post_id = str(self.post.id)
+
+    def test_manual_unauthorized_branches(self):
+        fake_request = SimpleNamespace(user=AnonymousUser())
+
+        # create_forum -> 403
+        data = ForumCreateSchema(title="X", description="Y")
+        resp: Response = create_forum(fake_request, data)
+        self.assertEqual(resp.status_code, 403)
+
+        # get_forums_by_user -> 403
+        resp2: Response = get_forums_by_user(fake_request)
+        self.assertEqual(resp2.status_code, 403)
+
+    def test_create_and_reply(self):
+        ok = self._req(
+            "POST",
 
     def test_create_forum_success(self):
         """Test creating a forum post successfully."""
@@ -385,5 +406,3 @@ class ForumAPITestCase(TestCase):
         # ---- get_forums_by_user → expected 403 ----
         resp2 = get_forums_by_user(fake_request)
         self.assertEqual(resp2.status_code, 403)
-
-

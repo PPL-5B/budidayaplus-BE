@@ -4,6 +4,8 @@ from django.shortcuts import get_object_or_404
 from forum.models import Forum, ForumVote
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
+
 
 
 class ForumRepository:
@@ -16,7 +18,6 @@ class ForumRepository:
         user: User,
         title: str | None,
         description: str,
-        tag: str,
         parent: Optional[Forum] = None,
     ) -> Forum:
         if parent and (title is None or title.strip() == ""):
@@ -26,7 +27,6 @@ class ForumRepository:
             user=user,
             title=title or "",      # fallback agar kolom tidak null
             description=description,
-            tag=tag,
             parent=parent,
         )
 
@@ -66,19 +66,14 @@ class ForumRepository:
         return list(forum.replies.all())
 
     @staticmethod
-    def update_forum(
-        forum_id: UUID, 
-        title: str | None = None, 
-        description: str | None = None,
-        tag: str | None = None
-    ) -> Forum:
+    def update_forum(forum_id: UUID, title: str | None = None, description: str | None = None) -> Forum:
+
         forum = get_object_or_404(Forum, id=forum_id)
         if title is not None:
             forum.title = title
         if description is not None:
             forum.description = description
-        if tag is not None:
-            forum.tag = tag
+
         forum.save()
         return forum
 
@@ -108,3 +103,14 @@ class ForumRepository:
             'upvotes': forum.upvotes,
             'downvotes': forum.downvotes,
         }
+
+    @staticmethod
+    def search_forums(query: str) -> List[Forum]:
+        """
+        Search forums by title and description
+        """
+        return Forum.objects.filter(
+            models.Q(title__icontains=query) | 
+            models.Q(description__icontains=query),
+            parent__isnull=True  
+        ).order_by('-timestamp')

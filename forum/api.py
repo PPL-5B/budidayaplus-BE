@@ -8,9 +8,9 @@ from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchem
 from forum.repositories.forum_repository import ForumRepository
 from forum.models import Forum
 from ninja_jwt.authentication import JWTAuth
-from django.http import Http404
+from ninja import Query
 from silk.profiling.profiler import silk_profile
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 
 router = Router()
 
@@ -22,7 +22,7 @@ def create_forum(request, data: ForumCreateSchema):
     # Post utama harus punya title
     if data.parent_id is None and not data.title:
         return Response({"error": "Title wajib diisi."}, status=400)
-   
+
     parent_forum = None
     if data.parent_id:
         try:
@@ -50,7 +50,7 @@ def create_reply(request, data: ForumCreateSchema):
 
     reply = ForumRepository.create_forum(
         user=request.user,
-        title=data.title or f"Reply to {parent_forum.title}",
+        title=data.title,               # boleh None
         description=data.description,
         tag=data.tag,
         parent=parent_forum
@@ -187,3 +187,13 @@ def vote_summary(request, forum_id: UUID):
     
     user_vote = ForumVote.objects.filter(user=request.user, forum=forum).first()
     summary["user_vote"] = user_vote.vote_choice if user_vote else None
+
+    return summary
+
+@router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
+def search_forums(request, query: str = Query(..., description="Search query")):
+    if not query.strip():
+        return Response({"error": "Search query cannot be empty"}, status=400)
+    
+    results = ForumRepository.search_forums(query)
+    return results
