@@ -19,7 +19,7 @@ def create_forum(request, data: ForumCreateSchema):
     # Post utama harus punya title
     if data.parent_id is None and not data.title:
         return Response({"error": "Title wajib diisi."}, status=400)
-
+   
     parent_forum = None
     if data.parent_id:
         try:
@@ -31,6 +31,7 @@ def create_forum(request, data: ForumCreateSchema):
         user=request.user,
         title=data.title,
         description=data.description,
+        tag=data.tag,
         parent=parent_forum
     )
     return new_forum
@@ -46,8 +47,9 @@ def create_reply(request, data: ForumCreateSchema):
 
     reply = ForumRepository.create_forum(
         user=request.user,
-        title=data.title,               # boleh None
+        title=data.title or f"Reply to {parent_forum.title}",
         description=data.description,
+        tag=data.tag,
         parent=parent_forum
     )
     return reply
@@ -81,7 +83,8 @@ def get_list_forums(request):
 
 @router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_forums_by_user(request):
-    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
+    if not request.user.is_authenticated: 
+        return Response({"error": "You are not authorized to access this resource."}, status=403)
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
@@ -143,5 +146,3 @@ def vote_summary(request, forum_id: UUID):
     
     user_vote = ForumVote.objects.filter(user=request.user, forum=forum).first()
     summary["user_vote"] = user_vote.vote_choice if user_vote else None
-
-    return summary
