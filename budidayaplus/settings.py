@@ -1,3 +1,4 @@
+
 """
 Django settings for budidayaplus project.
 
@@ -14,7 +15,6 @@ from datetime import timedelta
 from pathlib import Path
 from django.conf import settings
 import os
-# from dotenv import load_dotenv 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,9 +34,11 @@ ALLOWED_HOSTS = [
     '103.177.95.189', 
     'localhost',
     '127.0.0.1',
+
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
-    "https://budidayaplus-fe-gray.vercel.app"
+    "https://budidayaplus-fe-gray.vercel.app",
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 
@@ -141,7 +143,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://dkn-budidayaplus.vercel.app",
     "https://dkn-budidayaplus-staging.vercel.app",
     "http://localhost:8080",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "https://budidayaplus-fe-alpha.vercel.app"
 ]
 
 CORS_ALLOW_METHODS = [
@@ -195,12 +198,8 @@ load_dotenv()
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get("DB_NAME"),
-        'USER': os.environ.get("DB_USER"),
-        'PASSWORD': os.environ.get("DB_PASS"),
-        'HOST': os.environ.get("DB_HOST"),
-        'PORT': os.environ.get("DB_PORT"),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

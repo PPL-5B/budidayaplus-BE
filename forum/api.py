@@ -12,8 +12,8 @@ router = Router()
 
 @router.post("/create", response=ForumOutputSchema, auth=JWTAuth())
 def create_forum(request, data: ForumCreateSchema):
-
-    if not request.user.is_authenticated: return Response({"error": "You are not authorized to create this forum post."}, status=403)
+    if not request.user.is_authenticated: 
+        return Response({"error": "You are not authorized to create this forum post."}, status=403)
    
     parent_forum = None
     if data.parent_id:
@@ -26,7 +26,9 @@ def create_forum(request, data: ForumCreateSchema):
    
     new_forum = ForumRepository.create_forum(
         user=request.user,
+        title=data.title,
         description=data.description,
+        tag=data.tag,
         parent=parent_forum
     )
     return new_forum
@@ -46,7 +48,9 @@ def create_reply(request, data: ForumCreateSchema):
     # Create the reply, associating it with the parent forum.
     reply = ForumRepository.create_forum(
         user=request.user,
+        title=data.title or f"Reply to {parent_forum.title}",
         description=data.description,
+        tag=data.tag,
         parent=parent_forum
     )
     return reply
@@ -79,7 +83,8 @@ def get_list_forums(request):
 
 @router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_forums_by_user(request):
-    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
+    if not request.user.is_authenticated: 
+        return Response({"error": "You are not authorized to access this resource."}, status=403)
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
@@ -102,13 +107,18 @@ def get_replies(request, forum_id: UUID):
 @router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     """
-    Endpoint untuk memperbarui deskripsi forum.
+    Endpoint untuk memperbarui forum.
     """
     forum = ForumRepository.get_forum_by_id(forum_id)
     
     if request.user != forum.user:
-        return {"error": "You are not authorized to update this forum post."}, 403
+        return Response({"error": "You are not authorized to update this forum post."}, status=403)
     
-    updated_forum = ForumRepository.update_forum(forum_id, data.description)
+    updated_forum = ForumRepository.update_forum(
+        forum_id=forum_id,
+        title=data.title,
+        description=data.description,
+        tag=data.tag
+    )
     return updated_forum
 
