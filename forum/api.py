@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from forum.models import ForumVote
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
+from forum.models import Forum
 from ninja_jwt.authentication import JWTAuth
 from django.http import Http404, HttpResponse
 
@@ -86,6 +87,20 @@ def get_forums_by_user(request):
     if not request.user.is_authenticated: 
         return Response({"error": "You are not authorized to access this resource."}, status=403)
     forums = ForumRepository.get_forums_by_user(request.user)
+    return forums
+
+@router.get("/get_by_tag/{tag}", response=List[ForumOutputSchema], auth=JWTAuth())
+def get_forums_by_tag(request, tag: str):
+    """
+    Endpoint to get forums filtered by tag.
+    """
+    # Validate that the tag is one of the allowed choices
+    valid_tags = [tag_choice[0] for tag_choice in Forum.TAG_CHOICES]
+    
+    if tag not in valid_tags:
+        return Response({"error": f"Invalid tag. Tag must be one of: {', '.join(valid_tags)}"}, status=400)
+    
+    forums = ForumRepository.get_forums_by_tag(tag)
     return forums
 
 @router.get("/get_latest", response=ForumOutputSchema, auth=JWTAuth())

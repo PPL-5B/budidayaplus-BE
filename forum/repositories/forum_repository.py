@@ -43,6 +43,13 @@ class ForumRepository:
         return Forum.objects.filter(user=user)
 
     @staticmethod
+    def get_forums_by_tag(tag: str) -> List[Forum]:
+        """
+        Gets all forums with the specified tag.
+        """
+        return Forum.objects.filter(tag=tag)
+
+    @staticmethod
     def get_latest_forum() -> Optional[Forum]:
         try:
             return Forum.objects.latest('timestamp')

@@ -45,6 +45,30 @@ class ForumRepositoryTest(TestCase):
         Forum.objects.all().delete()
         self.assertIsNone(ForumRepository.get_latest_forum())
 
+    def test_get_forums_by_tag(self):
+        """Test getting forums filtered by a specific tag."""
+        # Should return only forums with the 'ikan' tag
+        ikan_forums = ForumRepository.get_forums_by_tag("ikan")
+        self.assertEqual(len(ikan_forums), 1)
+        self.assertEqual(ikan_forums[0].tag, "ikan")
+        
+        # Should return only forums with the 'kolam' tag
+        kolam_forums = ForumRepository.get_forums_by_tag("kolam")
+        self.assertEqual(len(kolam_forums), 1)
+        self.assertEqual(kolam_forums[0].tag, "kolam")
+
+    def test_get_forums_by_tag_empty(self):
+        """Test getting forums with a tag that doesn't exist in any forum."""
+        # No forum has 'budidayaplus' tag yet
+        forums = ForumRepository.get_forums_by_tag("budidayaplus")
+        self.assertEqual(len(forums), 0)
+        
+    def test_get_forums_by_tag_invalid(self):
+        """Test getting forums with an invalid tag (should still query DB but return empty)."""
+        # 'invalid_tag' is not in TAG_CHOICES but the repository method doesn't validate
+        forums = ForumRepository.get_forums_by_tag("invalid_tag")
+        self.assertEqual(len(forums), 0)
+
     # ---------- replies ----------
     def test_replies_and_auto_title(self):
         reply = ForumRepository.create_forum(
