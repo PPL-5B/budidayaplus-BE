@@ -18,6 +18,7 @@ class ForumRepository:
         user: User,
         title: str | None,
         description: str,
+        tag: str,
         parent: Optional[Forum] = None,
     ) -> Forum:
         if parent and (title is None or title.strip() == ""):
@@ -26,6 +27,7 @@ class ForumRepository:
         return Forum.objects.create(
             user=user,
             title=title or "",      # fallback agar kolom tidak null
+            tag=tag, 
             description=description,
             parent=parent,
         )
