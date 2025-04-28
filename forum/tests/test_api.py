@@ -3,9 +3,9 @@ from unittest.mock import patch
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 import uuid
+
 import json
-from forum.repositories.forum_repository import ForumRepository
-from ninja_jwt.tokens import RefreshToken
+import uuid
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -85,6 +85,15 @@ class ForumAPITestCase(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
+        self.post_id = str(self.post.id)
+
+    def test_manual_unauthorized_branches(self):
+        fake_request = SimpleNamespace(user=AnonymousUser())
+
+        # create_forum -> 403
+        data = ForumCreateSchema(title="X", description="Y")
+        resp: Response = create_forum(fake_request, data)
+        self.assertEqual(resp.status_code, 403)
 
     def _authenticated_get(self, url, token):
         """Helper to make an authenticated GET request."""
@@ -297,9 +306,44 @@ class ForumAPITestCase(TestCase):
         self.assertIn("error", response.json())
         self.assertEqual(response.json()["error"], "No forums available.")
 
+    def test_get_forums_by_tag_api_success(self):
+        """Test the API endpoint for getting forums by tag."""
+        # Create another forum with 'ikan' tag for testing multiple results
+        ForumRepository.create_forum(
+            user=self.other_user,
+            title="Another Ikan Forum",
+            description="Another post about fish",
+            tag="ikan"
+        )
+        
+        response = self._authenticated_get("/api/forum/get_by_tag/ikan", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        forums = response.json()
+        self.assertEqual(len(forums), 2)
+        self.assertTrue(all(forum["tag"] == "ikan" for forum in forums))
+
+    def test_get_forums_by_tag_api_no_results(self):
+        """Test the API endpoint for getting forums by tag when none exist."""
+        response = self._authenticated_get("/api/forum/get_by_tag/budidayaplus", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        forums = response.json()
+        self.assertEqual(len(forums), 0)
+        
+    def test_get_forums_by_tag_api_invalid_tag(self):
+        """Test the API endpoint with an invalid tag."""
+        response = self._authenticated_get("/api/forum/get_by_tag/invalid_tag", self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+        self.assertTrue("Invalid tag" in response.json()["error"])
+
+    def test_get_forums_by_tag_api_unauthenticated(self):
+        """Test the API endpoint without authentication."""
+        response = self.client.get("/api/forum/get_by_tag/ikan")
+        self.assertEqual(response.status_code, 401)
+
     def test_get_replies_success(self):
         """Test retrieving replies for a forum."""
-        reply = ForumRepository.create_forum(
+        ForumRepository.create_forum(
             user=self.user,
             title="Reply Title",
             description="Reply content",
@@ -362,4 +406,3 @@ class ForumAPITestCase(TestCase):
         # ---- get_forums_by_user → expected 403 ----
         resp2 = get_forums_by_user(fake_request)
         self.assertEqual(resp2.status_code, 403)
-

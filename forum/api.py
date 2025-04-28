@@ -1,13 +1,16 @@
 from typing import List
-from ninja import Router
+from ninja import Router, Query
 from ninja.responses import Response
 from uuid import UUID
 from django.contrib.auth.models import User
+from forum.models import ForumVote
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
+from forum.models import Forum
 from ninja_jwt.authentication import JWTAuth
-from django.http import Http404, HttpResponse, JsonResponse
 from ninja import Query
+from silk.profiling.profiler import silk_profile
+from django.http import Http404, HttpResponse, JsonResponse
 
 router = Router()
 
@@ -73,12 +76,36 @@ def get_forum_by_id(request, forum_id: UUID):
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)
         return forum
-    except Exception:
+    except Http404:
         return Response({"error": "Forum not found"}, status=404)
 
+# @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
+# @silk_profile(name="forum_api:list_forums")
+# def get_list_forums(request):
+#     # Gunakan profiling terpisah untuk query database
+#     with silk_profile(name="forum_api:db_query"):
+#         forums = ForumRepository.list_forums()
+    
+#     # Profiling untuk pemrosesan data setelah query (jika ada)
+#     with silk_profile(name="forum_api:post_processing"):
+#         # Jika ada pemrosesan data tambahan, letakkan di sini
+#         pass
+        
+#     return forums
+
 @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
-def get_list_forums(request):
-    forums = ForumRepository.list_forums()
+@silk_profile(name="forum_api:list_forums")
+def get_list_forums(request, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+    """
+    Endpoint untuk mengambil daftar forum dengan pagination dan optimisasi query.
+    """
+    with silk_profile(name="forum_api:db_query"):
+        forums = ForumRepository.list_forums(limit=limit, offset=offset)
+
+    # Optional: post processing bisa dilakukan di sini kalau butuh
+    with silk_profile(name="forum_api:post_processing"):
+        pass
+
     return forums
 
 @router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
@@ -86,6 +113,20 @@ def get_forums_by_user(request):
     if not request.user.is_authenticated: 
         return Response({"error": "You are not authorized to access this resource."}, status=403)
     forums = ForumRepository.get_forums_by_user(request.user)
+    return forums
+
+@router.get("/get_by_tag/{tag}", response=List[ForumOutputSchema], auth=JWTAuth())
+def get_forums_by_tag(request, tag: str):
+    """
+    Endpoint to get forums filtered by tag.
+    """
+    # Validate that the tag is one of the allowed choices
+    valid_tags = [tag_choice[0] for tag_choice in Forum.TAG_CHOICES]
+    
+    if tag not in valid_tags:
+        return Response({"error": f"Invalid tag. Tag must be one of: {', '.join(valid_tags)}"}, status=400)
+    
+    forums = ForumRepository.get_forums_by_tag(tag)
     return forums
 
 @router.get("/get_latest", response=ForumOutputSchema, auth=JWTAuth())
@@ -104,7 +145,7 @@ def get_replies(request, forum_id: UUID):
     except Exception:
         return Response({"error": "Forum not found or invalid forum ID"}, status=404)
 
-@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
+@router.put("/{forum_id}", response={200: ForumOutputSchema, 403: dict, 404: dict}, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)
