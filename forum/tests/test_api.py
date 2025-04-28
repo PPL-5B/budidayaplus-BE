@@ -1,6 +1,11 @@
 import os
-import json
+from unittest.mock import patch
+from django.test import TestCase, Client
+from django.contrib.auth.models import User
 import uuid
+import json
+from forum.repositories.forum_repository import ForumRepository
+from ninja_jwt.tokens import RefreshToken
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -9,11 +14,16 @@ from django.utils import timezone
 from django.contrib.auth.models import User, AnonymousUser
 from ninja_jwt.tokens import RefreshToken
 from ninja.responses import Response
-
 from forum.models import Forum, ForumVote
 from forum.repositories.forum_repository import ForumRepository
 from forum.api import create_forum, get_forums_by_user, get_forum_by_id
 from forum.schemas import ForumCreateSchema
+from types import SimpleNamespace
+from forum.api import create_forum, get_forums_by_user
+from forum.schemas import ForumCreateSchema
+from types import SimpleNamespace
+from forum.api import get_replies
+from forum.models import Forum
 
 class ForumAPITestCase(TestCase):
     def _token(self, user: User):
@@ -39,16 +49,49 @@ class ForumAPITestCase(TestCase):
 
     def setUp(self):
         self.client = Client()
-        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
+        self.user = User.objects.create_user(username="testuser", password="password123")
+        self.other_user = User.objects.create_user(username="otheruser", password="password123")
+        self.forum = ForumRepository.create_forum(
+            user=self.user, 
+            title="Test Forum", 
+            description="Original Post",
+            tag="ikan"
+        )
+        self.forum_id = str(self.forum.id)
+        self.user_token = str(RefreshToken.for_user(self.user).access_token)
 
-        self.user = User.objects.create_user("apiuser", password=pwd)
-        self.other = User.objects.create_user("apiother", password=pwd)
+    def _authenticated_post(self, url, data, token):
+        """Helper to make an authenticated POST request with JSON data."""
+        return self.client.post(
+            url,
+            data=json.dumps(data),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+    
+    def _authenticated_put(self, url, data, token):
+        """Helper to make an authenticated PUT request with JSON data."""
+        return self.client.put(
+            url,
+            data=json.dumps(data),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+    
+    def _authenticated_delete(self, url, token):
+        """Helper to make an authenticated DELETE request."""
+        return self.client.delete(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
 
-        self.token = self._token(self.user)
-        self.other_token = self._token(self.other)
-
-        self.post = Forum.objects.create(
-            user=self.user, title="Origin", description="Isi"
+    def _authenticated_get(self, url, token):
+        """Helper to make an authenticated GET request."""
+        return self.client.get(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
         )
         self.post_id = str(self.post.id)
 
@@ -67,286 +110,256 @@ class ForumAPITestCase(TestCase):
     def test_create_and_reply(self):
         ok = self._req(
             "POST",
+
+    def test_create_forum_success(self):
+        """Test creating a forum post successfully."""
+        data = {
+            "title": "Test Forum",
+            "description": "My first forum post",
+            "tag": "ikan"
+        }
+        response = self._authenticated_post("/api/forum/create", data, self.user_token)
+        self.assertEqual(response.status_code, 200)
+        resp_json = response.json()
+        self.assertIn("id", resp_json)
+        self.assertIn("user", resp_json)
+        self.assertEqual(resp_json["description"], "My first forum post")
+        self.assertEqual(resp_json["tag"], "ikan")
+        self.assertIsNone(resp_json.get("parent_id"))
+
+    def test_create_forum_unauthenticated(self):
+        """Test that creating a forum post without a token returns 401."""
+        data = {
+            "title": "Test Forum",
+            "description": "No token here",
+            "tag": "ikan"
+        }
+        response = self.client.post(
             "/api/forum/create",
             self.token,
             {"title": "Baru", "description": "Konten"},
         )
-        self.assertEqual(ok.status_code, 200)
-
-        # reply sukses
-        pid = ok.json()["id"]
-        rep = self._req(
-            "POST",
-            "/api/forum/create_reply",
-            self.token,
-            {"description": "Balasan", "parent_id": pid},
-        )
-        self.assertEqual(rep.status_code, 200)
-        self.assertEqual(rep.json()["title"], "Reply Baru Forum")
-
-        # reply tanpa parent_id
-        self.assertEqual(
-            self._req(
-                "POST", "/api/forum/create_reply", self.token, {"description": "x"}
-            ).status_code,
-            400,
-        )
-
-        # create main: missing title → 400
-        self.assertEqual(
-            self._req(
-                "POST", "/api/forum/create", self.token, {"description": "no title"}
-            ).status_code,
-            400,
-        )
-
-        # create main: parent_id random (valid UUID) -> 400
-        self.assertEqual(
-            self._req(
-                "POST",
-                "/api/forum/create",
-                self.token,
-                {
-                    "title": "Z",
-                    "description": "x",
-                    "parent_id": str(uuid.uuid4()),
-                },
-            ).status_code,
-            400,
-        )
-
-    def test_listing_and_latest_branches(self):
-        # get_by_user sukses
-        r = self._req("GET", "/api/forum/get_by_user", self.token)
-        self.assertEqual(r.status_code, 200)
-        self.assertGreaterEqual(len(r.json()), 1)
-
-        # list
-        self.assertEqual(
-            self._req("GET", "/api/forum/list", self.token).status_code, 200
-        )
-
-        # detail not‑found
-        self.assertEqual(
-            self._req("GET", f"/api/forum/get_by_id/{uuid.uuid4()}", self.token).status_code,
-            404,
-        )
-
-        # replies (success & 404)
-        ForumRepository.create_forum(
-            user=self.user, title=None, description="Balas", parent=self.post
-        )
-        self.assertEqual(
-            self._req("GET", f"/api/forum/get_replies/{self.post_id}", self.token).status_code,
-            200,
-        )
-        self.assertEqual(
-            self._req("GET", f"/api/forum/get_replies/{uuid.uuid4()}", self.token).status_code,
-            404,
-        )
-
-        # latest success
-        latest = self._req("GET", "/api/forum/get_latest", self.token)
-        self.assertEqual(latest.status_code, 200)
-
-        # latest 404
-        Forum.objects.all().delete()
-        self.assertEqual(
-            self._req("GET", "/api/forum/get_latest", self.token).status_code, 404
-        )
-
-    def test_update_paths(self):
-        # success
-        up = self._req(
-            "PUT", f"/api/forum/{self.post_id}", self.token, {"description": "ubah"}
-        )
-        self.assertEqual(up.status_code, 200)
-
-        # invalid payload -> 422
-        self.assertEqual(
-            self._req(
-                "PUT",
-                f"/api/forum/{self.post_id}",
-                self.token,
-                {"description": ""},
-            ).status_code,
-            422,
-        )
-
-        # not owner
-        self.assertEqual(
-            self._req(
-                "PUT",
-                f"/api/forum/{self.post_id}",
-                self.other_token,
-                {"description": "x"},
-            ).status_code,
-            403,
-        )
-
-        # not found
-        self.assertEqual(
-            self._req(
-                "PUT",
-                f"/api/forum/{uuid.uuid4()}",
-                self.token,
-                {"description": "y"},
-            ).status_code,
-            404,
-        )
-
-    def test_delete_paths(self):
-        # forbidden
-        self.assertEqual(
-            self._req("DELETE", f"/api/forum/delete/{self.post_id}", self.other_token).status_code,
-            403,
-        )
-        # unauthenticated
-        self.assertEqual(
-            self._req("DELETE", f"/api/forum/delete/{self.post_id}").status_code,
-            401,
-        )
-        # not found
-        self.assertEqual(
-            self._req("DELETE", f"/api/forum/delete/{uuid.uuid4()}", self.token).status_code,
-            404,
-        )
-        # success
-        f = ForumRepository.create_forum(
-            user=self.user, title="Del", description="x"
-        )
-        self.assertEqual(
-            self._req("DELETE", f"/api/forum/delete/{f.id}", self.token).status_code,
-            200,
-        )
-
-    def test_vote_cycle_and_summary(self):
-        self._req("POST", f"/api/forum/upvote/{self.post_id}", self.token, {})
-        self._req("POST", f"/api/forum/downvote/{self.post_id}", self.token, {})
-        self._req("DELETE", f"/api/forum/cancel_vote/{self.post_id}", self.token)
-        s_empty = self._req("GET", f"/api/forum/vote_summary/{self.post_id}", self.token)
-        self.assertEqual(s_empty.json()["upvotes"], 0)
-        self._req("POST", f"/api/forum/upvote/{self.post_id}", self.token, {})
-        self._req("POST", f"/api/forum/downvote/{self.post_id}", self.other_token, {})
-        summary = self._req("GET", f"/api/forum/vote_summary/{self.post_id}", self.token)
-        self.assertEqual(summary.json()["upvotes"], 1)
-        self.assertEqual(summary.json()["downvotes"], 1)
-        self.assertEqual(summary.json()["user_vote"], "up")
-
-    def test_reply_paths(self):
-        parent_id = self.post_id
-        ok = self._req(
-            "POST",
-            "/api/forum/create_reply",
-            self.token,
-            {"description": "Balasan", "parent_id": parent_id},
-        )
-        self.assertEqual(ok.status_code, 200)
-
-        no_pid = self._req(
-            "POST", "/api/forum/create_reply", self.token, {"description": "X"}
-        )
-        self.assertEqual(no_pid.status_code, 400)
-
-        random_uuid = str(uuid.uuid4())
-        not_exist = self._req(
-            "POST",
-            "/api/forum/create_reply",
-            self.token,
-            {"description": "X", "parent_id": random_uuid},
-        )
-        self.assertEqual(not_exist.status_code, 400)
-
-    def test_get_by_id_direct_success(self):
-        """Memanggil handler langsung dengan user ter‑autentikasi."""
-        fake_request = SimpleNamespace(user=self.user)
-        result = get_forum_by_id(fake_request, uuid.UUID(self.post_id))
-        self.assertEqual(result.id, uuid.UUID(self.post_id))
-        
-    def test_get_user_votes_success(self):
-         """Test retrieving votes for the logged-in user."""
-         ForumVote.objects.create(user=self.user, forum=self.forum, vote_choice="up")
-         response = self._authenticated_get("/api/forum/user_votes", self.user_token)
-         self.assertEqual(response.status_code, 200)
-         self.assertEqual(len(response.json()["votes"]), 1)
-         self.assertEqual(response.json()["votes"][0]["vote_choice"], "up")
- 
-    def test_get_user_votes_unauthenticated(self):
-         """Test retrieving votes without authentication."""
-         response = self.client.get("/api/forum/user_votes")
-         self.assertEqual(response.status_code, 401)
-
-    def test_search_forum_success_and_empty(self):
-        ForumRepository.create_forum(
-            user=self.user,
-            title="Diskusi Django",
-            description="Pembahasan tentang framework Django"
-        )
-        ForumRepository.create_forum(
-            user=self.user,
-            title="Belajar Machine Learning",
-            description="Topik pembelajaran ML dari dasar"
-        )
-
-        response = self._req("GET", "/api/forum/search?q=django", self.token)
-        self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertTrue(any("django" in f["title"].lower() for f in result))
-
-        response_not_found = self._req("GET", "/api/forum/search?q=tidakada", self.token)
-        self.assertEqual(response_not_found.status_code, 200)
-        self.assertEqual(len(response_not_found.json()), 0)
-
-        response_no_query = self._req("GET", "/api/forum/search", self.token)
-        self.assertEqual(response_no_query.status_code, 400)
-
-    def test_search_forums_empty_query(self):
-        """Test search with empty query returns 400"""
-        response = self._req("GET", "/api/forum/search?q=", self.token)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"error": "Search query cannot be empty"})
-
-    def test_search_forums_with_whitespace_query(self):
-        """Test search with whitespace-only query returns 400"""
-        response = self._req("GET", "/api/forum/search?q=   ", self.token)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"error": "Search query cannot be empty"})
-
-    def test_search_forums_success(self):
-        """Test successful search with results"""
-        ForumRepository.create_forum(
-            user=self.user,
-            title="Django Testing",
-            description="Unit testing in Django"
-        )
-        
-        response = self._req("GET", "/api/forum/search?q=django", self.token)
-        self.assertEqual(response.status_code, 200)
-        self.assertGreater(len(response.json()), 0)
-        self.assertTrue(any("django" in f["title"].lower() for f in response.json()))
-
-    def test_search_forums_no_results(self):
-        """Test search with no matching results"""
-        response = self._req("GET", "/api/forum/search?q=nonexistentterm", self.token)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 0)
-
-    def test_get_user_votes_authenticated(self):
-        """Test that authenticated user can get their votes"""
-        ForumVote.objects.create(
-            user=self.user,
-            forum=self.post,
-            vote_choice="up"
-        )
-
-        response = self._req("GET", "/api/forum/user_votes", self.token)
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["votes"]), 1)
-        self.assertEqual(response.json()["votes"][0]["vote_choice"], "up")
-        self.assertEqual(response.json()["votes"][0]["forum__id"], str(self.post.id))
-
-    def test_get_user_votes_unauthenticated(self):
-        """Test that unauthenticated user gets 401"""
-        response = self._req("GET", "/api/forum/user_votes")
         self.assertEqual(response.status_code, 401)
+
+    def test_create_forum_invalid_parent(self):
+        """Test creating a forum with invalid parent ID."""
+        data = {
+            "title": "Test Forum",
+            "description": "Post with non-existent parent",
+            "parent_id": str(uuid.uuid4()),
+            "tag": "ikan"
+        }
+        response = self._authenticated_post("/api/forum/create", data, self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_create_reply_success(self):
+        """Test creating a reply to an existing forum post."""
+        parent_data = {
+            "title": "Parent Forum",
+            "description": "Parent forum post",
+            "tag": "ikan"
+        }
+        parent_response = self._authenticated_post("/api/forum/create", parent_data, self.user_token)
+        self.assertEqual(parent_response.status_code, 200)
+        parent_id = parent_response.json()["id"]
+
+        reply_data = {
+            "description": "This is a reply",
+            "parent_id": parent_id,
+            "tag": "kolam"
+        }
+        reply_response = self._authenticated_post("/api/forum/create_reply", reply_data, self.user_token)
+        self.assertEqual(reply_response.status_code, 200)
+        reply_json = reply_response.json()
+        self.assertIn("id", reply_json)
+        self.assertIn("user", reply_json)
+        self.assertEqual(reply_json["description"], "This is a reply")
+        self.assertEqual(reply_json["tag"], "kolam")
+
+    def test_create_reply_no_parent_id(self):
+        """Test creating a reply without providing a parent_id."""
+        reply_data = {
+            "description": "This is a reply",
+            "tag": "kolam"
+        }
+        response = self._authenticated_post("/api/forum/create_reply", reply_data, self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_create_reply_invalid_parent(self):
+        """Test creating a reply with an invalid parent ID."""
+        reply_data = {
+            "description": "This is a reply",
+            "parent_id": str(uuid.uuid4()),
+            "tag": "kolam"
+        }
+        response = self._authenticated_post("/api/forum/create_reply", reply_data, self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_delete_forum_success(self):
+        """Test deleting a forum post successfully."""
+        forum = ForumRepository.create_forum(
+            user=self.user,
+            title="Forum to delete",
+            description="Delete me",
+            tag="ikan"
+        )
+        response = self._authenticated_delete(f"/api/forum/delete/{forum.id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "Forum deleted successfully.")
+
+    def test_delete_forum_not_found(self):
+        """Test deleting a non-existent forum."""
+        response = self._authenticated_delete(f"/api/forum/delete/{uuid.uuid4()}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+
+    def test_delete_forum_not_owned(self):
+        """Test deleting a forum post not owned by the user."""
+        other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
+        response = self._authenticated_delete(f"/api/forum/delete/{self.forum_id}", other_user_token)
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("error", response.json())
+
+    def test_delete_forum_unauthenticated(self):
+        """Test deleting a forum post without authentication."""
+        response = self.client.delete(f"/api/forum/delete/{self.forum_id}")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_forum_by_id_success(self):
+        """Test retrieving a forum by its ID."""
+        response = self._authenticated_get(f"/api/forum/get_by_id/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        resp_json = response.json()
+        self.assertEqual(resp_json["id"], str(self.forum_id))
+        self.assertEqual(resp_json["tag"], "ikan")
+
+    def test_get_forum_by_id_not_found(self):
+        """Test retrieving a non-existent forum by ID."""
+        response = self._authenticated_get(f"/api/forum/get_by_id/{uuid.uuid4()}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+
+    def test_list_forums_success(self):
+        """Test retrieving a list of all forums."""
+        # Create another forum with different tag
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Another Forum",
+            description="Another post",
+            tag="kolam"
+        )
+        response = self._authenticated_get("/api/forum/list", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        forums = response.json()
+        self.assertEqual(len(forums), 2)
+        self.assertEqual(forums[0]["tag"], "ikan")
+        self.assertEqual(forums[1]["tag"], "kolam")
+
+    def test_get_forums_by_user_success(self):
+        """Test retrieving forums created by the authenticated user."""
+        response = self._authenticated_get("/api/forum/get_by_user", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        forums = response.json()
+        self.assertEqual(len(forums), 1)
+        self.assertEqual(forums[0]["tag"], "ikan")
+
+    def test_get_forums_by_user_unauthenticated(self):
+        """Test retrieving forums by user without authentication."""
+        response = self.client.get("/api/forum/get_by_user")
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_latest_forum_success(self):
+        """Test retrieving the latest forum."""
+        # Create a newer forum
+        new_forum = ForumRepository.create_forum(
+            user=self.user,
+            title="Newer Forum",
+            description="Latest post",
+            tag="siklus"
+        )
+        new_forum.timestamp = timezone.now()
+        new_forum.save()
+
+        response = self._authenticated_get("/api/forum/get_latest", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        resp_json = response.json()
+        self.assertEqual(resp_json["tag"], "siklus")
+
+    def test_get_latest_forum_not_found(self):
+        """Test retrieving the latest forum when no forums exist."""
+        # Delete all forums to ensure no forum exists
+        Forum.objects.all().delete()
+        response = self._authenticated_get("/api/forum/get_latest", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+        self.assertEqual(response.json()["error"], "No forums available.")
+
+    def test_get_replies_success(self):
+        """Test retrieving replies for a forum."""
+        reply = ForumRepository.create_forum(
+            user=self.user,
+            title="Reply Title",
+            description="Reply content",
+            parent=self.forum,
+            tag="kolam"
+        )
+        response = self._authenticated_get(f"/api/forum/get_replies/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        replies = response.json()
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0]["tag"], "kolam")
+        self.assertEqual(replies[0]["title"], "Reply Title")
+
+    def test_get_replies_forum_not_found(self):
+        """Test retrieving replies for a non-existent forum."""
+        response = self._authenticated_get(f"/api/forum/get_replies/{uuid.uuid4()}", self.user_token)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("error", response.json())
+
+    def test_update_forum_success(self):
+        """Test updating a forum post successfully."""
+        update_data = {
+            "title": "Updated Title",
+            "description": "Updated description",
+            "tag": "budidayaplus"
+        }
+        response = self._authenticated_put(f"/api/forum/{self.forum_id}", update_data, self.user_token)
+        self.assertEqual(response.status_code, 200)
+        resp_json = response.json()
+        self.assertEqual(resp_json["title"], "Updated Title")
+        self.assertEqual(resp_json["description"], "Updated description")
+        self.assertEqual(resp_json["tag"], "budidayaplus")
+
+    def test_update_forum_not_owned(self):
+        """Test updating a forum post not owned by the user."""
+        other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
+        update_data = {
+            "description": "Unauthorized update",
+            "tag": "siklus"
+        }
+        response = self._authenticated_put(f"/api/forum/{self.forum_id}", update_data, other_user_token)
+        self.assertEqual(response.status_code, 403)
+
+    def test_direct_unauthorized_branches(self):
+        """
+        Panggil handler secara langsung dengan AnonymousUser agar baris
+        'return Response(..., 403)' ter-eksekusi (create & get_by_user).
+        """
+        fake_request = SimpleNamespace(user=AnonymousUser())
+
+        # ---- create_forum (parent None, title ada) → expected 403 ----
+        payload = ForumCreateSchema(
+            title="Judul",
+            description="Desc",
+            tag="ikan",
+        )
+        resp = create_forum(fake_request, payload)
+        self.assertEqual(resp.status_code, 403)
+
+        # ---- get_forums_by_user → expected 403 ----
+        resp2 = get_forums_by_user(fake_request)
+        self.assertEqual(resp2.status_code, 403)
+

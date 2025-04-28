@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
 
+
 class ForumRepository:
     @staticmethod
     def get_forum_by_id(forum_id: UUID) -> Forum:
@@ -54,11 +55,13 @@ class ForumRepository:
 
     @staticmethod
     def update_forum(forum_id: UUID, title: str | None = None, description: str | None = None) -> Forum:
+
         forum = get_object_or_404(Forum, id=forum_id)
         if title is not None:
             forum.title = title
         if description is not None:
             forum.description = description
+
         forum.save()
         return forum
 

@@ -3,7 +3,6 @@ from ninja import Router
 from ninja.responses import Response
 from uuid import UUID
 from django.contrib.auth.models import User
-from forum.models import ForumVote
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
 from ninja_jwt.authentication import JWTAuth
@@ -32,6 +31,7 @@ def create_forum(request, data: ForumCreateSchema):
         user=request.user,
         title=data.title,
         description=data.description,
+        tag=data.tag,
         parent=parent_forum
     )
     return new_forum
@@ -49,6 +49,7 @@ def create_reply(request, data: ForumCreateSchema):
         user=request.user,
         title=data.title,               # boleh None
         description=data.description,
+        tag=data.tag,
         parent=parent_forum
     )
     return reply
@@ -72,7 +73,7 @@ def get_forum_by_id(request, forum_id: UUID):
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)
         return forum
-    except Http404:
+    except Exception:
         return Response({"error": "Forum not found"}, status=404)
 
 @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
@@ -82,7 +83,8 @@ def get_list_forums(request):
 
 @router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_forums_by_user(request):
-    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
+    if not request.user.is_authenticated: 
+        return Response({"error": "You are not authorized to access this resource."}, status=403)
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
@@ -101,18 +103,8 @@ def get_replies(request, forum_id: UUID):
         return replies
     except Exception:
         return Response({"error": "Forum not found or invalid forum ID"}, status=404)
-    
-@router.get("/user_votes", auth=JWTAuth())
-def get_votes_by_user(request):
-    """
-    Mendapatkan semua vote yang diberikan oleh user yang sedang login.
-    """
-    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
 
-    votes = ForumVote.objects.filter(user=request.user).values("forum__id", "forum__description", "vote_choice")
-    return JsonResponse({"votes": list(votes)}, safe=False)
-
-@router.put("/{forum_id}", response={200: ForumOutputSchema, 403: dict, 404: dict}, auth=JWTAuth())
+@router.put("/{forum_id}", response=ForumOutputSchema, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)

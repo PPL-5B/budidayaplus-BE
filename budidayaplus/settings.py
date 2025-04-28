@@ -1,3 +1,4 @@
+
 """
 Django settings for budidayaplus project.
 
@@ -64,6 +65,7 @@ INSTALLED_APPS = [
     'forum',
     'rest_framework',
     'rest_framework.authtoken',
+    'silk',
 ]
 
 NINJA_JWT = {
@@ -136,6 +138,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'silk.middleware.SilkyMiddleware',
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -221,6 +224,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# settings.py
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -245,20 +256,22 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Sentry
-# import sentry_sdk
+import sentry_sdk
 
-# sentry_sdk.init(
-#     dsn="https://d53d83da381b3e92d55a2f9399859789@o4509004052627456.ingest.de.sentry.io/4509004056428624",
-#     # Add data like request headers and IP for users,
-#     # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-#     send_default_pii=True,
-#     # Set traces_sample_rate to 1.0 to capture 100%
-#     # of transactions for tracing.
-#     traces_sample_rate=1.0,
-#     _experiments={
-#         # Set continuous_profiling_auto_start to True
-#         # to automatically start the profiler on when
-#         # possible.
-#         "continuous_profiling_auto_start": True,
-#     },
-# )
+sentry_sdk.init(
+    dsn="https://d53d83da381b3e92d55a2f9399859789@o4509004052627456.ingest.de.sentry.io/4509004056428624",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for tracing.
+    traces_sample_rate=1.0,
+    _experiments={
+        # Set continuous_profiling_auto_start to True
+        # to automatically start the profiler on when
+        # possible.
+        "continuous_profiling_auto_start": True,
+    },
+)
+
+SILKY_PYTHON_PROFILER = True

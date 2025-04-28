@@ -13,6 +13,8 @@ class ForumCreateSchema(Schema):
     title: Optional[str] = Field(None, max_length=255)
     description: str
     parent_id: Optional[UUID4] = None
+    tag: str = Field(..., description="Tag must be one of: ikan, kolam, siklus, budidayaplus")
+
 
 
 class ForumReplySchema(Schema):
@@ -28,6 +30,7 @@ class ForumOutputSchema(Schema):
     user: UserSchema
     title: Optional[str] = None
     description: str
+    tag: str
     timestamp: datetime
     parent_id: Optional[UUID4] = None
     replies: List[ForumReplySchema] = []
@@ -42,6 +45,7 @@ class ForumListSchema(Schema):
 class ForumUpdateSchema(Schema):
     title: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = Field(None, min_length=1)
+    tag: Optional[str] = Field(None, description="Tag must be one of: ikan, kolam, siklus, budidayaplus")
 
     @validator('title', 'description')
     def not_empty(cls, v):
