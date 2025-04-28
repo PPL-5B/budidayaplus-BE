@@ -16,6 +16,7 @@ class ForumCreateSchema(Schema):
     tag: str = Field(..., description="Tag must be one of: ikan, kolam, siklus, budidayaplus")
 
 
+
 class ForumReplySchema(Schema):
     id: UUID4
     user: UserSchema
