@@ -1,12 +1,17 @@
+import os
 from unittest.mock import patch
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 import uuid
+
 import json
-from forum.repositories.forum_repository import ForumRepository
-from ninja_jwt.tokens import RefreshToken
+import uuid
 from datetime import timedelta
+from types import SimpleNamespace
+
+from django.test import TestCase, Client
 from django.utils import timezone
+
 from types import SimpleNamespace
 from django.contrib.auth.models import AnonymousUser
 from forum.api import create_forum, get_forums_by_user
@@ -17,6 +22,27 @@ from forum.models import Forum
 
 
 class ForumAPITestCase(TestCase):
+    def _token(self, user: User):
+        return str(RefreshToken.for_user(user).access_token)
+
+    def _req(self, method: str, url: str, token=None, body=None):
+        hdrs = {"content_type": "application/json"}
+        if token:
+            hdrs["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        if body is not None:
+            hdrs["data"] = json.dumps(body)
+
+        match method:
+            case "GET":
+                return self.client.get(url, **hdrs)
+            case "POST":
+                return self.client.post(url, **hdrs)
+            case "PUT":
+                return self.client.put(url, **hdrs)
+            case "DELETE":
+                return self.client.delete(url, **hdrs)
+        raise ValueError("Bad HTTP verb")
+
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", password="password123")
@@ -55,6 +81,15 @@ class ForumAPITestCase(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
+        self.post_id = str(self.post.id)
+
+    def test_manual_unauthorized_branches(self):
+        fake_request = SimpleNamespace(user=AnonymousUser())
+
+        # create_forum -> 403
+        data = ForumCreateSchema(title="X", description="Y")
+        resp: Response = create_forum(fake_request, data)
+        self.assertEqual(resp.status_code, 403)
 
     def _authenticated_get(self, url, token):
         """Helper to make an authenticated GET request."""
@@ -89,8 +124,8 @@ class ForumAPITestCase(TestCase):
         }
         response = self.client.post(
             "/api/forum/create",
-            data=json.dumps(data),
-            content_type="application/json"
+            self.token,
+            {"title": "Baru", "description": "Konten"},
         )
         self.assertEqual(response.status_code, 401)
 
@@ -350,6 +385,5 @@ class ForumAPITestCase(TestCase):
         # ---- get_forums_by_user → expected 403 ----
         resp2 = get_forums_by_user(fake_request)
         self.assertEqual(resp2.status_code, 403)
-
 
 
