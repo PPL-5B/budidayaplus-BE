@@ -115,6 +115,16 @@ def get_forums_by_user(request):
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
+from silk.profiling.profiler import silk_profile
+@silk_profile(name="Profiling Search Forum")
+@router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
+def search_forums(request, query: str = Query(..., description="Search query")):
+    if not query.strip():
+        return Response({"error": "Search query cannot be empty"}, status=400)
+    
+    results = ForumRepository.search_forums(query)
+    return results
+
 @router.get("/get_by_tag/{tag}", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_forums_by_tag(request, tag: str):
     """
@@ -190,10 +200,4 @@ def vote_summary(request, forum_id: UUID):
 
     return summary
 
-@router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
-def search_forums(request, query: str = Query(..., description="Search query")):
-    if not query.strip():
-        return Response({"error": "Search query cannot be empty"}, status=400)
-    
-    results = ForumRepository.search_forums(query)
-    return results
+
