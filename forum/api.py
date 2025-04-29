@@ -115,6 +115,16 @@ def get_forums_by_user(request):
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
+from silk.profiling.profiler import silk_profile
+@silk_profile(name="Profiling Search Forum")
+@router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
+def search_forums(request, query: str = Query(..., description="Search query")):
+    if not query.strip():
+        return Response({"error": "Search query cannot be empty"}, status=400)
+    
+    results = ForumRepository.search_forums(query)
+    return results
+
 @router.get("/get_by_tag/{tag}", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_forums_by_tag(request, tag: str):
     """
@@ -144,6 +154,16 @@ def get_replies(request, forum_id: UUID):
         return replies
     except Exception:
         return Response({"error": "Forum not found or invalid forum ID"}, status=404)
+    
+@router.get("/user_votes", auth=JWTAuth())
+def get_votes_by_user(request):
+    """
+    Mendapatkan semua vote yang diberikan oleh user yang sedang login.
+    """
+    if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
+
+    votes = ForumVote.objects.filter(user=request.user).values("forum__id", "forum__description", "vote_choice")
+    return JsonResponse({"votes": list(votes)}, safe=False)
 
 @router.put("/{forum_id}", response={200: ForumOutputSchema, 403: dict, 404: dict}, auth=JWTAuth())
 def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
@@ -190,10 +210,4 @@ def vote_summary(request, forum_id: UUID):
 
     return summary
 
-@router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
-def search_forums(request, query: str = Query(..., description="Search query")):
-    if not query.strip():
-        return Response({"error": "Search query cannot be empty"}, status=400)
-    
-    results = ForumRepository.search_forums(query)
-    return results
+
