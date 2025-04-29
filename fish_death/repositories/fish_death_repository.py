@@ -27,7 +27,9 @@ class FishDeathRepository:
     
     @staticmethod
     def get_existing_fish_death(cycle: Cycle, pond: Pond, today: date) -> Optional[FishDeath]:
-        return FishDeath.objects.filter(cycle=cycle, pond=pond, recorded_at__date=today).first()
+        return FishDeath.objects.select_related("pond", "cycle", "reporter").filter(
+            cycle=cycle, pond=pond, recorded_at__date=today
+        ).first()
     
     @staticmethod
     def create_fish_death(pond: Pond, reporter: User, cycle: Cycle, recorded_at: date, 
@@ -48,7 +50,9 @@ class FishDeathRepository:
     @staticmethod
     def get_latest_fish_death(pond: Pond, cycle: Cycle) -> Optional[FishDeath]:
         try:
-            return FishDeath.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
+            return FishDeath.objects.select_related("pond", "cycle", "reporter").filter(
+                pond=pond, cycle=cycle
+            ).latest('recorded_at')
         except ObjectDoesNotExist:
             return None
     
