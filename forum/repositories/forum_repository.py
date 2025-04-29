@@ -16,7 +16,7 @@ class ForumRepository:
     @staticmethod
     def create_forum(
         user: User,
-        title: str | None,
+        title: str,
         description: str,
         tag: str,
         parent: Optional[Forum] = None,
@@ -68,7 +68,7 @@ class ForumRepository:
         return list(forum.replies.all())
 
     @staticmethod
-    def update_forum(forum_id: UUID, title: str | None = None, description: str | None = None) -> Forum:
+    def update_forum(forum_id: UUID, title: str, description: str) -> Forum:
 
         forum = get_object_or_404(Forum, id=forum_id)
         if title is not None:
