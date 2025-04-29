@@ -16,7 +16,7 @@ class ForumRepository:
     @staticmethod
     def create_forum(
         user: User,
-        title: str | None,
+        title: str,
         description: str,
         tag: str,
         parent: Optional[Forum] = None,
