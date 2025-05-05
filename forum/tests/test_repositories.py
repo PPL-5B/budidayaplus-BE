@@ -94,12 +94,6 @@ class ForumRepositoryTest(TestCase):
         # Forum lainnya tidak terhapus
         self.assertTrue(Forum.objects.filter(id=self.f2.id).exists())
 
-
-    # def test_delete(self):
-    #     ForumRepository.delete_forum(self.f2)
-    #     with self.assertRaises(Http404):
-    #         ForumRepository.get_forum_by_id(self.f2.id)
-
     # ---------- voting ----------
     def test_vote_cycle(self):
         ForumRepository.upvote_forum(self.user, self.f1)
