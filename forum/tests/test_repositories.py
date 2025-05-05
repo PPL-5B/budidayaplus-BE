@@ -81,10 +81,24 @@ class ForumRepositoryTest(TestCase):
             ForumRepository.update_forum(uuid4(), description="tak ada")
 
     # ---------- delete ----------
-    def test_delete(self):
-        ForumRepository.delete_forum(self.f2)
-        with self.assertRaises(Http404):
-            ForumRepository.get_forum_by_id(self.f2.id)
+    def test_delete_forum(self):
+        # Pastikan forum masih ada sebelum dihapus
+        self.assertTrue(Forum.objects.filter(id=self.f1.id).exists())
+
+        # Hapus forum
+        ForumRepository.delete_forum(self.f1)
+
+        # Pastikan forum sudah tidak ada
+        self.assertFalse(Forum.objects.filter(id=self.f1.id).exists())
+
+        # Forum lainnya tidak terhapus
+        self.assertTrue(Forum.objects.filter(id=self.f2.id).exists())
+
+
+    # def test_delete(self):
+    #     ForumRepository.delete_forum(self.f2)
+    #     with self.assertRaises(Http404):
+    #         ForumRepository.get_forum_by_id(self.f2.id)
 
     # ---------- voting ----------
     def test_vote_cycle(self):
@@ -123,3 +137,4 @@ class ForumRepositoryTest(TestCase):
         summary = ForumRepository.get_vote_summary(self.f1)
         self.assertEqual(summary['upvotes'], 0)
         self.assertEqual(summary['downvotes'], 0)
+
