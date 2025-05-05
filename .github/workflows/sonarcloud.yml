@@ -80,6 +80,36 @@ jobs:
       run: |
         coverage xml || echo "Failed to generate coverage.xml"
 
+    # Check coverage threshold
+    - name: Check Coverage Threshold
+      id: coverage_check
+      run: |
+        COVERAGE_THRESHOLD=90
+        COVERAGE_PERCENT=$(coverage report | grep TOTAL | awk '{print $NF}' | sed 's/%//')
+        echo "Coverage percentage: $COVERAGE_PERCENT%"
+        echo "coverage_percent=$COVERAGE_PERCENT" >> $GITHUB_OUTPUT
+        if (( $(echo "$COVERAGE_PERCENT < $COVERAGE_THRESHOLD" | bc -l) )); then
+          echo "❌ Code coverage is below the required threshold of $COVERAGE_THRESHOLD% (Current: $COVERAGE_PERCENT%)"
+          echo "coverage_status=failed" >> $GITHUB_OUTPUT
+        else
+          echo "✅ Code coverage meets the required threshold of $COVERAGE_THRESHOLD% (Current: $COVERAGE_PERCENT%)"
+          echo "coverage_status=success" >> $GITHUB_OUTPUT
+        fi
+    
+    # Create a GitHub status check for coverage
+    - name: Create Coverage Status Check
+      if: github.event_name == 'pull_request' && github.base_ref == 'dev'
+      uses: LouisBrunner/checks-action@v1.6.2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: coverage-threshold-check
+        conclusion: ${{ steps.coverage_check.outputs.coverage_status }}
+        output: |
+          {
+            "title": "Code Coverage Check",
+            "summary": "Required: 90%, Current: ${{ steps.coverage_check.outputs.coverage_percent }}%"
+          }
+
     # Debug: Check if coverage.xml was created
     - name: Debug - Check if coverage.xml file exists
       run: |
