@@ -188,12 +188,6 @@ def upvote_forum(request, forum_id: UUID):
     ForumRepository.upvote_forum(request.user, forum)
     return HttpResponse(status=204)
 
-@router.post("/downvote/{forum_id}", auth=JWTAuth())
-def downvote_forum(request, forum_id: UUID):
-    forum = ForumRepository.get_forum_by_id(forum_id)
-    ForumRepository.downvote_forum(request.user, forum)
-    return HttpResponse(status=204)
-
 @router.delete("/cancel_vote/{forum_id}", auth=JWTAuth())
 def cancel_vote(request, forum_id: UUID):
     forum = ForumRepository.get_forum_by_id(forum_id)
