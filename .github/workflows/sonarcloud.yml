@@ -116,16 +116,13 @@ jobs:
     # Create a GitHub status check for coverage (now checking new code only)
     - name: Create Coverage Status Check
       if: github.event_name == 'pull_request' && github.base_ref == 'dev'
-      uses: LouisBrunner/checks-action@v1.6.2
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        name: coverage-threshold-check
-        conclusion: ${{ steps.coverage_check.outputs.coverage_status }}
-        output: |
-          {
-            "title": "New Code Coverage Check",
-            "summary": "Required: 90%, Current: ${{ steps.coverage_check.outputs.coverage_percent }}%"
-          }
+      run: |
+        if [[ "${{ steps.coverage_check.outputs.coverage_status }}" == "failed" ]]; then
+          echo "::error::Coverage below threshold: Required 90%, Current ${{ steps.coverage_check.outputs.coverage_percent }}%"
+          exit 1
+        else
+          echo "✅ Coverage meets threshold: Required 90%, Current ${{ steps.coverage_check.outputs.coverage_percent }}%"
+        fi
 
     # Debug: Check if coverage.xml was created
     - name: Debug - Check if coverage.xml file exists
