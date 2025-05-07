@@ -1,105 +1,61 @@
-import os
-from uuid import uuid4
-from django.test import TestCase
-from django.contrib.auth.models import User
-from forum.models import Forum
-from forum.schemas import (
-    ForumCreateSchema,
-    ForumListSchema,
-    ForumOutputSchema,
-    ForumUpdateSchema,
-)
+from ninja import Schema
+from pydantic import UUID4, Field, validator
+from datetime import datetime
+from typing import List, Optional
+from user_profile.schemas import UserSchema
+
+class ForumCreateSchema(Schema):
+    title: Optional[str] = Field(None, max_length=255)
+    description: str
+    parent_id: Optional[UUID4] = None
+    tag: str = Field(..., description="Tag must be one of: ikan, kolam, siklus, budidayaplus")
+    extra_field: str = Field(None)
 
 
-class ForumSchemaTest(TestCase):
-    def setUp(self):
-        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
-        self.user = User.objects.create_user(
-            username="schema_user",
-            first_name="Schema",
-            last_name="User",
-            password=pwd,
-        )
+class ForumReplySchema(Schema):
+    id: UUID4
+    user: UserSchema
+    description: str
+    timestamp: datetime
+    title: Optional[str] = None
+    
+    @validator("description")
+    def check_title_description(cls, v):
+        if len(v) < 5:
+            raise ValueError("Description must be at least 5 characters")
+        return v
 
-    # ------------ ForumCreateSchema ------------
-    def test_create_schema_main_and_reply(self):
-        main = ForumCreateSchema(
-            title="Judul",
-            description="Deskripsi",
-            tag="ikan"
-        )
-        self.assertEqual(main.title, "Judul")
-        self.assertEqual(main.tag, "ikan")
-        self.assertIsNone(main.parent_id)
 
-        pid = uuid4()
-        reply = ForumCreateSchema(description="Balasan", parent_id=pid, tag="kolam")
-        self.assertIsNone(reply.title)
-        self.assertEqual(str(reply.parent_id), str(pid))
-        self.assertEqual(reply.tag, "kolam")
+class ForumOutputSchema(Schema):
+    id: UUID4
+    user: UserSchema
+    title: Optional[str] = None
+    description: str
+    tag: str
+    timestamp: datetime
+    parent_id: Optional[UUID4] = None
+    replies: List[ForumReplySchema] = []
+    upvotes: int
+    related_forums: List[ForumOutputSchema] = []
 
-    # ------------ ForumUpdateSchema ------------
-    def test_update_schema_validation(self):
-        ok = ForumUpdateSchema(title="Baru", description="Ubah", tag="siklus")
-        self.assertEqual(ok.description, "Ubah")
-        self.assertEqual(ok.tag, "siklus")
 
-        # None boleh
-        self.assertIsNone(ForumUpdateSchema().title)
-        self.assertIsNone(ForumUpdateSchema().tag)
+class ForumListSchema(Schema):
+    forums: List[ForumOutputSchema]
 
-        # String kosong → error
-        with self.assertRaises(ValueError):
-            ForumUpdateSchema(title="")
-        with self.assertRaises(ValueError):
-            ForumUpdateSchema(description="   ")
 
-    # ------------ ForumOutputSchema & List ------------
-    def test_output_and_list_schema(self):
-        post = Forum.objects.create(
-            user=self.user, title="Judul", description="Isi", tag="ikan"
-        )
-        reply = Forum.objects.create(
-            user=self.user,
-            title="Reply Judul Forum",
-            description="Balasan",
-            parent=post,
-            tag="kolam"
-        )
+class ForumUpdateSchema(Schema):
+    title: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, min_length=1)
+    tag: Optional[str] = Field(None, description="Tag must be one of: ikan, kolam, siklus, budidayaplus")
 
-        udata = {
-            "id": self.user.id,
-            "username": self.user.username,
-            "first_name": self.user.first_name,
-            "last_name": self.user.last_name,
-        }
+    @validator('title', 'description')
+    def not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('Field tidak boleh kosong')
+        return v
 
-        payload = {
-            "id": post.id,
-            "user": udata,
-            "title": post.title,
-            "description": post.description,
-            "tag": post.tag,
-            "timestamp": post.timestamp,
-            "parent_id": None,
-            "replies": [
-                {
-                    "id": reply.id,
-                    "user": udata,
-                    "title": reply.title,
-                    "description": reply.description,
-                    "tag": reply.tag,
-                    "timestamp": reply.timestamp,
-                }
-            ],
-            "upvotes": 0,
-            "downvotes": 0,
-        }
-        out = ForumOutputSchema(**payload)
-        self.assertEqual(out.replies[0].title, "Reply Judul Forum")
-        self.assertEqual(out.tag, "ikan")
-        self.assertEqual(out.replies[0].tag, "kolam")
-
-        # List
-        lst = ForumListSchema(forums=[payload])
-        self.assertEqual(len(lst.forums), 1)
+    @validator('tag')
+    def check_tag_validity(cls, v):
+        if v not in ["ikan", "kolam", "siklus", "budidayaplus"]:
+            raise ValueError('Invalid tag')
+        return v
