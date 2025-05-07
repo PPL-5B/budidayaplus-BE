@@ -36,10 +36,6 @@ class ForumRepository:
     def delete_forum(forum: Forum):
         forum.delete()
 
-    # @staticmethod
-    # def list_forums() -> List[Forum]:
-    #     return Forum.objects.all()
-
     @staticmethod
     def list_forums(limit=20, offset=0):
         return Forum.objects.select_related("user") \
@@ -81,19 +77,8 @@ class ForumRepository:
 
     @staticmethod
     def upvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'up'}
-        )
-    
-    @staticmethod
-    def downvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'down'}
-        )
+        ForumVote.objects.get_or_create(user=user, forum=forum)
+
 
     @staticmethod
     def cancel_vote(user: User, forum: Forum):
@@ -103,7 +88,6 @@ class ForumRepository:
     def get_vote_summary(forum: Forum) -> dict:
         return {
             'upvotes': forum.upvotes,
-            'downvotes': forum.downvotes,
         }
 
     @staticmethod
