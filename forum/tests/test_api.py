@@ -1,3 +1,4 @@
+import os
 import uuid
 import json
 from django.test import TestCase, Client
@@ -8,9 +9,11 @@ from forum.repositories.forum_repository import ForumRepository
 
 class ForumExtraAPITestCase(TestCase):
     def setUp(self):
+        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123") 
+
         self.client = Client()
-        self.user = User.objects.create_user(username="user1", password="pass")
-        self.user2 = User.objects.create_user(username="user2", password="pass")
+        self.user = User.objects.create_user(username="user1", password=pwd)
+        self.user2 = User.objects.create_user(username="user2", password=pwd)
         self.token = str(RefreshToken.for_user(self.user).access_token)
         self.token2 = str(RefreshToken.for_user(self.user2).access_token)
         self.forum = ForumRepository.create_forum(
