@@ -59,6 +59,7 @@ class ForumAPITestCase(TestCase):
         )
         self.forum_id = str(self.forum.id)
         self.user_token = str(RefreshToken.for_user(self.user).access_token)
+        self.other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
 
     def _authenticated_post(self, url, data, token):
         """Helper to make an authenticated POST request with JSON data."""
@@ -85,15 +86,6 @@ class ForumAPITestCase(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
-        self.post_id = str(self.post.id)
-
-    def test_manual_unauthorized_branches(self):
-        fake_request = SimpleNamespace(user=AnonymousUser())
-
-        # create_forum -> 403
-        data = ForumCreateSchema(title="X", description="Y")
-        resp: Response = create_forum(fake_request, data)
-        self.assertEqual(resp.status_code, 403)
 
     def _authenticated_get(self, url, token):
         """Helper to make an authenticated GET request."""
@@ -102,7 +94,6 @@ class ForumAPITestCase(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {token}"
         )
-        self.post_id = str(self.post.id)
 
     def test_manual_unauthorized_branches(self):
         fake_request = SimpleNamespace(user=AnonymousUser())
@@ -154,8 +145,8 @@ class ForumAPITestCase(TestCase):
         }
         response = self.client.post(
             "/api/forum/create",
-            self.token,
-            {"title": "Baru", "description": "Konten"},
+            data=json.dumps(data),
+            content_type="application/json"
         )
         self.assertEqual(response.status_code, 401)
 
@@ -236,8 +227,7 @@ class ForumAPITestCase(TestCase):
 
     def test_delete_forum_not_owned(self):
         """Test deleting a forum post not owned by the user."""
-        other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
-        response = self._authenticated_delete(f"/api/forum/delete/{self.forum_id}", other_user_token)
+        response = self._authenticated_delete(f"/api/forum/delete/{self.forum_id}", self.other_user_token)
         self.assertEqual(response.status_code, 403)
         self.assertIn("error", response.json())
 
@@ -275,6 +265,28 @@ class ForumAPITestCase(TestCase):
         self.assertEqual(len(forums), 2)
         self.assertEqual(forums[0]["tag"], "ikan")
         self.assertEqual(forums[1]["tag"], "kolam")
+
+    def test_list_forums_pagination(self):
+        """Test pagination in list forums endpoint."""
+        # Create multiple forums
+        for i in range(15):
+            ForumRepository.create_forum(
+                user=self.user,
+                title=f"Forum {i}",
+                description=f"Description {i}",
+                tag="ikan"
+            )
+        
+        # Test limit
+        response = self._authenticated_get("/api/forum/list?limit=5", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 5)
+        
+        # Test offset
+        response = self._authenticated_get("/api/forum/list?limit=5&offset=5", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 5)
+        self.assertEqual(response.json()[0]["title"], "Forum 5")
 
     def test_get_forums_by_user_success(self):
         """Test retrieving forums created by the authenticated user."""
@@ -388,13 +400,114 @@ class ForumAPITestCase(TestCase):
 
     def test_update_forum_not_owned(self):
         """Test updating a forum post not owned by the user."""
-        other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
         update_data = {
             "description": "Unauthorized update",
             "tag": "siklus"
         }
-        response = self._authenticated_put(f"/api/forum/{self.forum_id}", update_data, other_user_token)
+        response = self._authenticated_put(f"/api/forum/{self.forum_id}", update_data, self.other_user_token)
         self.assertEqual(response.status_code, 403)
+
+    def test_update_forum_not_found(self):
+        """Test updating a non-existent forum."""
+        update_data = {
+            "title": "Updated Title",
+            "description": "Updated description",
+            "tag": "budidayaplus"
+        }
+        response = self._authenticated_put(f"/api/forum/{uuid.uuid4()}", update_data, self.user_token)
+        self.assertEqual(response.status_code, 404)
+
+    def test_vote_operations(self):
+        """Test upvote, downvote, and cancel vote operations."""
+        # Test upvote
+        response = self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
+        self.assertEqual(response.status_code, 204)
+        
+        # Test vote summary after upvote
+        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["upvotes"], 1)
+        self.assertEqual(response.json()["user_vote"], "upvote")
+        
+        # Test downvote (should replace upvote)
+        response = self._authenticated_post(f"/api/forum/downvote/{self.forum_id}", {}, self.user_token)
+        self.assertEqual(response.status_code, 204)
+        
+        # Test vote summary after downvote
+        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["downvotes"], 1)
+        self.assertEqual(response.json()["user_vote"], "downvote")
+        
+        # Test cancel vote
+        response = self._authenticated_delete(f"/api/forum/cancel_vote/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 204)
+        
+        # Test vote summary after cancel
+        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["upvotes"], 0)
+        self.assertEqual(response.json()["downvotes"], 0)
+        self.assertIsNone(response.json()["user_vote"])
+
+    def test_get_user_votes(self):
+        """Test getting all votes by a user."""
+        # First create some votes
+        forum2 = ForumRepository.create_forum(
+            user=self.user,
+            title="Forum 2",
+            description="Another post",
+            tag="kolam"
+        )
+        
+        # Upvote first forum
+        self._authenticated_post(f"/api/forum/upvote/{self.forum_id}", {}, self.user_token)
+        # Downvote second forum
+        self._authenticated_post(f"/api/forum/downvote/{forum2.id}", {}, self.user_token)
+        
+        # Get user votes
+        response = self._authenticated_get("/api/forum/user_votes", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        votes = response.json()["votes"]
+        self.assertEqual(len(votes), 2)
+        
+        # Check the votes are correct
+        vote_forums = {v["forum__id"]: v["vote_choice"] for v in votes}
+        self.assertEqual(vote_forums[str(self.forum_id)], "upvote")
+        self.assertEqual(vote_forums[str(forum2.id)], "downvote")
+
+    def test_get_user_votes_unauthenticated(self):
+        """Test getting user votes without authentication."""
+        response = self.client.get("/api/forum/user_votes")
+        self.assertEqual(response.status_code, 401)
+
+    def test_search_forums_success(self):
+        """Test searching forums successfully."""
+        # Create a forum with unique text
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Unique Search Term",
+            description="This should be found",
+            tag="ikan"
+        )
+        
+        response = self._authenticated_get("/api/forum/search?query=Unique", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        results = response.json()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Unique Search Term")
+
+    def test_search_forums_empty_query(self):
+        """Test searching with empty query."""
+        response = self._authenticated_get("/api/forum/search?query=", self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_search_forums_no_results(self):
+        """Test searching with no matching results."""
+        response = self._authenticated_get("/api/forum/search?query=NoSuchTerm", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 0)
 
     def test_direct_unauthorized_branches(self):
         """
@@ -415,3 +528,29 @@ class ForumAPITestCase(TestCase):
         # ---- get_forums_by_user → expected 403 ----
         resp2 = get_forums_by_user(fake_request)
         self.assertEqual(resp2.status_code, 403)
+
+    def test_update_forum_exception_handling(self):
+        """Test exception handling in the update_forum endpoint."""
+        # Mock the repository to raise an exception
+        with patch('forum.repositories.forum_repository.ForumRepository.update_forum_by_id') as mock_update:
+            mock_update.side_effect = Exception("Test error")
+            
+            update_data = {
+                "title": "Updated Title",
+                "description": "Updated description",
+                "tag": "budidayaplus"
+            }
+            response = self._authenticated_put(f"/api/forum/update/{self.forum_id}", update_data, self.user_token)
+            
+            self.assertEqual(response.status_code, 500)
+            self.assertIn("error", response.json())
+            self.assertEqual(response.json()["error"], "Test error")
+
+    def test_vote_summary_no_vote(self):
+        """Test vote summary when user hasn't voted."""
+        response = self._authenticated_get(f"/api/forum/vote_summary/{self.forum_id}", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        summary = response.json()
+        self.assertEqual(summary["upvotes"], 0)
+        self.assertEqual(summary["downvotes"], 0)
+        self.assertIsNone(summary["user_vote"])
