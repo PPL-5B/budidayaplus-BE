@@ -36,10 +36,6 @@ class ForumRepository:
     def delete_forum(forum: Forum):
         forum.delete()
 
-    # @staticmethod
-    # def list_forums() -> List[Forum]:
-    #     return Forum.objects.all()
-
     @staticmethod
     def list_forums(limit=20, offset=0):
         return Forum.objects.select_related("user") \
