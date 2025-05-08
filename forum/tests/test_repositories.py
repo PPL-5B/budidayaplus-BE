@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.http import Http404
+from django.db.models import Q
 
 from forum.models import Forum, ForumVote
 from forum.repositories.forum_repository import ForumRepository
@@ -22,16 +23,58 @@ class ForumRepositoryTest(TestCase):
         self.f2 = ForumRepository.create_forum(
             user=self.user, title="P2", description="Y", tag="kolam"
         )
+        # Create a forum with a different user
+        self.f3 = ForumRepository.create_forum(
+            user=self.other, title="P3", description="Z", tag="ikan"
+        )
 
-    # ---------- basic ----------
-    def test_get_methods(self):
+    # ---------- basic CRUD operations ----------
+    def test_get_forum_by_id(self):
         self.assertEqual(ForumRepository.get_forum_by_id(self.f1.id), self.f1)
-        self.assertEqual(len(ForumRepository.list_forums()), 2)
-        self.assertEqual(len(ForumRepository.get_forums_by_user(self.user)), 2)
-        self.assertEqual(self.f1.tag, "ikan")
-        self.assertEqual(self.f2.tag, "kolam")
+        with self.assertRaises(Http404):
+            ForumRepository.get_forum_by_id(uuid4())
 
-    def test_latest(self):
+    def test_list_forums(self):
+        # Test default listing
+        forums = ForumRepository.list_forums()
+        self.assertEqual(len(forums), 3)
+        
+        # Test pagination
+        limited = ForumRepository.list_forums(limit=2)
+        self.assertEqual(len(limited), 2)
+        
+        offset = ForumRepository.list_forums(limit=1, offset=1)
+        self.assertEqual(len(offset), 1)
+        self.assertEqual(offset[0].id, self.f2.id)
+
+    def test_get_forums_by_user(self):
+        user_forums = ForumRepository.get_forums_by_user(self.user)
+        self.assertEqual(len(user_forums), 2)
+        self.assertTrue(all(f.user == self.user for f in user_forums))
+
+    def test_create_forum(self):
+        # Test creating a new forum
+        new_forum = ForumRepository.create_forum(
+            user=self.user,
+            title="New Forum",
+            description="New Description",
+            tag="budidayaplus"
+        )
+        self.assertEqual(new_forum.title, "New Forum")
+        self.assertEqual(new_forum.tag, "budidayaplus")
+        
+        # Test creating a reply with auto-generated title
+        reply = ForumRepository.create_forum(
+            user=self.user,
+            title=None,
+            description="Reply content",
+            parent=self.f1,
+            tag="siklus"
+        )
+        self.assertIn("Reply", reply.title)
+        self.assertEqual(reply.parent, self.f1)
+
+    def test_latest_forum(self):
         self.f1.timestamp = timezone.now() - timedelta(minutes=10)
         self.f1.save()
         self.f2.timestamp = timezone.now()
@@ -41,109 +84,167 @@ class ForumRepositoryTest(TestCase):
             self.f2.id,
         )
 
-    def test_latest_none(self):
+    def test_latest_forum_none(self):
         Forum.objects.all().delete()
         self.assertIsNone(ForumRepository.get_latest_forum())
 
+    # ---------- tag filtering ----------
     def test_get_forums_by_tag(self):
         """Test getting forums filtered by a specific tag."""
-        # Should return only forums with the 'ikan' tag
         ikan_forums = ForumRepository.get_forums_by_tag("ikan")
-        self.assertEqual(len(ikan_forums), 1)
-        self.assertEqual(ikan_forums[0].tag, "ikan")
+        self.assertEqual(len(ikan_forums), 2)
+        self.assertTrue(all(f.tag == "ikan" for f in ikan_forums))
         
-        # Should return only forums with the 'kolam' tag
         kolam_forums = ForumRepository.get_forums_by_tag("kolam")
         self.assertEqual(len(kolam_forums), 1)
         self.assertEqual(kolam_forums[0].tag, "kolam")
 
     def test_get_forums_by_tag_empty(self):
-        """Test getting forums with a tag that doesn't exist in any forum."""
-        # No forum has 'budidayaplus' tag yet
-        forums = ForumRepository.get_forums_by_tag("budidayaplus")
-        self.assertEqual(len(forums), 0)
-        
-    def test_get_forums_by_tag_invalid(self):
-        """Test getting forums with an invalid tag (should still query DB but return empty)."""
-        # 'invalid_tag' is not in TAG_CHOICES but the repository method doesn't validate
-        forums = ForumRepository.get_forums_by_tag("invalid_tag")
+        forums = ForumRepository.get_forums_by_tag("nonexistent")
         self.assertEqual(len(forums), 0)
 
     # ---------- replies ----------
-    def test_replies_and_auto_title(self):
+    def test_get_replies(self):
         reply = ForumRepository.create_forum(
             user=self.user,
-            title=None,
-            description="Balas",
+            title="Reply",
+            description="Reply content",
             parent=self.f1,
             tag="siklus"
         )
-        self.assertIn(reply, ForumRepository.get_replies(self.f1))
-        self.assertTrue(reply.title.startswith("Reply"))
-        self.assertEqual(reply.tag, "siklus")
+        replies = ForumRepository.get_replies(self.f1)
+        self.assertEqual(len(replies), 1)
+        self.assertEqual(replies[0], reply)
 
-    # ---------- update ----------
-    def test_update_paths(self):
-        # ubah desc
-        ForumRepository.update_forum(self.f1.id, description="Baru")
-        self.assertEqual(
-            Forum.objects.get(id=self.f1.id).description, "Baru"
+    def test_get_replies_empty(self):
+        replies = ForumRepository.get_replies(self.f2)
+        self.assertEqual(len(replies), 0)
+
+    # ---------- update operations ----------
+    def test_update_forum(self):
+        # Update title and description
+        updated = ForumRepository.update_forum_by_id(
+            self.f1.id,
+            title="Updated Title",
+            description="Updated Description"
         )
-        # ubah title
-        ForumRepository.update_forum(self.f1.id, title="Judul Baru")
-        self.assertEqual(Forum.objects.get(id=self.f1.id).title, "Judul Baru")
-        # ubah tag
-        ForumRepository.update_forum(self.f1.id, tag="budidayaplus")
-        self.assertEqual(Forum.objects.get(id=self.f1.id).tag, "budidayaplus")
-        # tidak ubah apa‑apa
-        nochange = ForumRepository.update_forum(self.f1.id)
-        self.assertEqual(nochange.title, "Judul Baru")
-        self.assertEqual(nochange.tag, "budidayaplus")
+        self.assertEqual(updated.title, "Updated Title")
+        self.assertEqual(updated.description, "Updated Description")
+        
+        # Verify changes persisted
+        refreshed = Forum.objects.get(id=self.f1.id)
+        self.assertEqual(refreshed.title, "Updated Title")
 
-    def test_update_not_found(self):
+    def test_update_forum_not_found(self):
         with self.assertRaises(Http404):
-            ForumRepository.update_forum(uuid4(), description="tak ada")
+            ForumRepository.update_forum_by_id(uuid4(), title="Not exist")
 
-    # ---------- delete ----------
-    def test_delete(self):
+    # ---------- delete operations ----------
+    def test_delete_forum(self):
         ForumRepository.delete_forum(self.f2)
         with self.assertRaises(Http404):
             ForumRepository.get_forum_by_id(self.f2.id)
 
-    # ---------- voting ----------
-    def test_vote_cycle(self):
+    # ---------- voting operations ----------
+    def test_vote_operations(self):
+        # Test upvote
         ForumRepository.upvote_forum(self.user, self.f1)
-        self.assertEqual(
-            ForumVote.objects.get(user=self.user, forum=self.f1).vote_choice,
-            "up",
-        )
+        vote = ForumVote.objects.get(user=self.user, forum=self.f1)
+        self.assertEqual(vote.vote_choice, "up")
+        
+        # Test downvote (should replace upvote)
         ForumRepository.downvote_forum(self.user, self.f1)
-        self.assertEqual(
-            ForumVote.objects.get(user=self.user, forum=self.f1).vote_choice,
-            "down",
-        )
+        vote.refresh_from_db()
+        self.assertEqual(vote.vote_choice, "down")
+        
+        # Test cancel vote
         ForumRepository.cancel_vote(self.user, self.f1)
         self.assertFalse(
             ForumVote.objects.filter(user=self.user, forum=self.f1).exists()
         )
 
     def test_vote_summary(self):
-        # 2 upvotes dari user dan other
+        # Initial state - no votes
+        summary = ForumRepository.get_vote_summary(self.f1)
+        self.assertEqual(summary['upvotes'], 0)
+        self.assertEqual(summary['downvotes'], 0)
+        
+        # Add some votes
         ForumRepository.upvote_forum(self.user, self.f1)
         ForumRepository.upvote_forum(self.other, self.f1)
         summary = ForumRepository.get_vote_summary(self.f1)
         self.assertEqual(summary['upvotes'], 2)
         self.assertEqual(summary['downvotes'], 0)
-
-        # ubah satu vote jadi down
+        
+        # Change one to downvote
         ForumRepository.downvote_forum(self.user, self.f1)
         summary = ForumRepository.get_vote_summary(self.f1)
         self.assertEqual(summary['upvotes'], 1)
         self.assertEqual(summary['downvotes'], 1)
 
-        # cancel all votes
-        ForumRepository.cancel_vote(self.user, self.f1)
-        ForumRepository.cancel_vote(self.other, self.f1)
-        summary = ForumRepository.get_vote_summary(self.f1)
-        self.assertEqual(summary['upvotes'], 0)
-        self.assertEqual(summary['downvotes'], 0)
+    # ---------- search operations ----------
+    def test_search_forums(self):
+        # Create a forum with unique text
+        unique_forum = ForumRepository.create_forum(
+            user=self.user,
+            title="Unique Search Term",
+            description="This should be found",
+            tag="ikan"
+        )
+        
+        # Search by title
+        results = ForumRepository.search_forums("Unique")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].id, unique_forum.id)
+        
+        # Search by description
+        results = ForumRepository.search_forums("should be found")
+        self.assertEqual(len(results), 1)
+        
+        # Search with no results
+        results = ForumRepository.search_forums("nonexistent term")
+        self.assertEqual(len(results), 0)
+
+    def test_search_forums_excludes_replies(self):
+        # Create a reply
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Reply with search term",
+            description="This is a reply",
+            parent=self.f1,
+            tag="ikan"
+        )
+        
+        # Search shouldn't return replies
+        results = ForumRepository.search_forums("reply")
+        self.assertEqual(len(results), 0)
+
+    # ---------- edge cases ----------
+    def test_create_forum_empty_title(self):
+        # Main post requires title
+        with self.assertRaises(Exception):
+            ForumRepository.create_forum(
+                user=self.user,
+                title="",
+                description="Content",
+                tag="ikan"
+            )
+        
+        # Reply can have empty title (will be auto-generated)
+        reply = ForumRepository.create_forum(
+            user=self.user,
+            title=None,
+            description="Reply content",
+            parent=self.f1,
+            tag="ikan"
+        )
+        self.assertTrue(reply.title.startswith("Reply"))
+
+    def test_update_forum_partial(self):
+        # Update only description
+        updated = ForumRepository.update_forum_by_id(
+            self.f1.id,
+            description="Only update description"
+        )
+        self.assertEqual(updated.title, self.f1.title)  # unchanged
+        self.assertEqual(updated.description, "Only update description")
