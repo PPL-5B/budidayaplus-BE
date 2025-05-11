@@ -36,4 +36,8 @@ jobs:
             echo DB_PORT=${{ secrets.DB_PORT }} >> .env
             echo PORT=8000 >> .env
             docker-compose up --build -d
+            
+            sleep 10
+
+            docker-compose exec web python manage.py loaddata tasks/fixtures/data.json || true
           EOF
