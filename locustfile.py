@@ -1,13 +1,15 @@
 from locust import HttpUser, TaskSet, task, between
 import json
 from datetime import datetime
+import os
 
 # Authentication API Tasks
 class AuthenticationTasks(TaskSet):
     def on_start(self):
         """Executed when a simulated user starts."""
+        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
         self.phone_number = "08123456789"
-        self.password = "AkuAnakEmo"
+        self.password = pwd
         self.first_name = "Omar"
         self.last_name = "Khalif"
         self.access_token = None
@@ -85,10 +87,11 @@ class FoodSamplingTasks(TaskSet):
 
     def login(self):
         """Simulate user login to get an access token."""
+        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
         try:
             response = self.client.post(
                 "/api/auth/login",
-                json={"phone_number": "08123456789", "password": "AkuAnakEmo"}
+                json={"phone_number": "08123456789", "password": pwd}
             )
             if response.status_code == 200:
                 result = response.json()
