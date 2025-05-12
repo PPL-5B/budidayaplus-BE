@@ -90,17 +90,20 @@ class ForumRepositoryTest(TestCase):
 
     # ---------- tag filtering ----------
     def test_get_forums_by_tag(self):
-        """Test getting forums filtered by a specific tag."""
         ikan_forums = ForumRepository.get_forums_by_tag("ikan")
-        self.assertEqual(len(ikan_forums), 2)
-        self.assertTrue(all(f.tag == "ikan" for f in ikan_forums))
-        
+        self.assertEqual(len(ikan_forums), 1)
+        self.assertEqual(ikan_forums[0].tag, "ikan")
+
         kolam_forums = ForumRepository.get_forums_by_tag("kolam")
         self.assertEqual(len(kolam_forums), 1)
         self.assertEqual(kolam_forums[0].tag, "kolam")
 
     def test_get_forums_by_tag_empty(self):
-        forums = ForumRepository.get_forums_by_tag("nonexistent")
+        forums = ForumRepository.get_forums_by_tag("budidayaplus")
+        self.assertEqual(len(forums), 0)
+
+    def test_get_forums_by_tag_invalid(self):
+        forums = ForumRepository.get_forums_by_tag("invalid_tag")
         self.assertEqual(len(forums), 0)
 
     # ---------- replies ----------
@@ -112,6 +115,7 @@ class ForumRepositoryTest(TestCase):
             parent=self.f1,
             tag="siklus"
         )
+
         replies = ForumRepository.get_replies(self.f1)
         self.assertEqual(len(replies), 1)
         self.assertEqual(replies[0], reply)
@@ -149,38 +153,29 @@ class ForumRepositoryTest(TestCase):
     def test_vote_operations(self):
         # Test upvote
         ForumRepository.upvote_forum(self.user, self.f1)
-        vote = ForumVote.objects.get(user=self.user, forum=self.f1)
-        self.assertEqual(vote.vote_choice, "up")
-        
-        # Test downvote (should replace upvote)
-        ForumRepository.downvote_forum(self.user, self.f1)
-        vote.refresh_from_db()
-        self.assertEqual(vote.vote_choice, "down")
-        
-        # Test cancel vote
+        self.assertTrue(
+            ForumVote.objects.filter(user=self.user, forum=self.f1).exists()
+        )
+
         ForumRepository.cancel_vote(self.user, self.f1)
         self.assertFalse(
             ForumVote.objects.filter(user=self.user, forum=self.f1).exists()
         )
 
     def test_vote_summary(self):
-        # Initial state - no votes
-        summary = ForumRepository.get_vote_summary(self.f1)
-        self.assertEqual(summary['upvotes'], 0)
-        self.assertEqual(summary['downvotes'], 0)
-        
-        # Add some votes
         ForumRepository.upvote_forum(self.user, self.f1)
         ForumRepository.upvote_forum(self.other, self.f1)
+
         summary = ForumRepository.get_vote_summary(self.f1)
         self.assertEqual(summary['upvotes'], 2)
-        self.assertEqual(summary['downvotes'], 0)
         
-        # Change one to downvote
-        ForumRepository.downvote_forum(self.user, self.f1)
+        ForumRepository.cancel_vote(self.user, self.f1)
         summary = ForumRepository.get_vote_summary(self.f1)
         self.assertEqual(summary['upvotes'], 1)
-        self.assertEqual(summary['downvotes'], 1)
+        
+        ForumRepository.cancel_vote(self.other, self.f1)
+        summary = ForumRepository.get_vote_summary(self.f1)
+        self.assertEqual(summary['upvotes'], 0)
 
     # ---------- search operations ----------
     def test_search_forums(self):

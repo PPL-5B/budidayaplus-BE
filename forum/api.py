@@ -16,9 +16,6 @@ router = Router()
 
 @router.post("/create", response=ForumOutputSchema, auth=JWTAuth())
 def create_forum(request, data: ForumCreateSchema):
-    if not request.user.is_authenticated:
-        return Response({"error": "You are not authorized to create this forum post."}, status=403)
-
     # Post utama harus punya title
     if data.parent_id is None and not data.title:
         return Response({"error": "Title wajib diisi."}, status=400)
@@ -79,39 +76,17 @@ def get_forum_by_id(request, forum_id: UUID):
     except Http404:
         return Response({"error": "Forum not found"}, status=404)
 
-# @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
-# @silk_profile(name="forum_api:list_forums")
-# def get_list_forums(request):
-#     # Gunakan profiling terpisah untuk query database
-#     with silk_profile(name="forum_api:db_query"):
-#         forums = ForumRepository.list_forums()
-    
-#     # Profiling untuk pemrosesan data setelah query (jika ada)
-#     with silk_profile(name="forum_api:post_processing"):
-#         # Jika ada pemrosesan data tambahan, letakkan di sini
-#         pass
-        
-#     return forums
-
 @router.get("/list", response=List[ForumOutputSchema], auth=JWTAuth())
 @silk_profile(name="forum_api:list_forums")
 def get_list_forums(request, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
     """
     Endpoint untuk mengambil daftar forum dengan pagination dan optimisasi query.
     """
-    with silk_profile(name="forum_api:db_query"):
-        forums = ForumRepository.list_forums(limit=limit, offset=offset)
-
-    # Optional: post processing bisa dilakukan di sini kalau butuh
-    with silk_profile(name="forum_api:post_processing"):
-        pass
-
+    forums = ForumRepository.list_forums(limit=limit, offset=offset)
     return forums
 
 @router.get("/get_by_user", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_forums_by_user(request):
-    if not request.user.is_authenticated: 
-        return Response({"error": "You are not authorized to access this resource."}, status=403)
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
@@ -162,7 +137,7 @@ def get_votes_by_user(request):
     """
     if not request.user.is_authenticated: return Response({"error": "You are not authorized to access this resource."}, status=403)
 
-    votes = ForumVote.objects.filter(user=request.user).values("forum__id", "forum__description", "vote_choice")
+    votes = ForumVote.objects.filter(user=request.user).values("forum__id", "forum__description") 
     return JsonResponse({"votes": list(votes)}, safe=False)
 
 @router.put("/{forum_id}", response={200: ForumOutputSchema, 403: dict, 404: dict}, auth=JWTAuth())
@@ -186,12 +161,6 @@ def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
 def upvote_forum(request, forum_id: UUID):
     forum = ForumRepository.get_forum_by_id(forum_id) 
     ForumRepository.upvote_forum(request.user, forum)
-    return HttpResponse(status=204)
-
-@router.post("/downvote/{forum_id}", auth=JWTAuth())
-def downvote_forum(request, forum_id: UUID):
-    forum = ForumRepository.get_forum_by_id(forum_id)
-    ForumRepository.downvote_forum(request.user, forum)
     return HttpResponse(status=204)
 
 @router.delete("/cancel_vote/{forum_id}", auth=JWTAuth())

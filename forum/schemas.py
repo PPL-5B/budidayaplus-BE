@@ -35,7 +35,6 @@ class ForumOutputSchema(Schema):
     parent_id: Optional[UUID4] = None
     replies: List[ForumReplySchema] = []
     upvotes: int
-    downvotes: int
 
 
 class ForumListSchema(Schema):
