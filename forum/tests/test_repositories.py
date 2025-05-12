@@ -143,11 +143,19 @@ class ForumRepositoryTest(TestCase):
         with self.assertRaises(Http404):
             ForumRepository.update_forum_by_id(uuid4(), title="Not exist")
 
-    # ---------- delete operations ----------
+    # ---------- delete ----------
     def test_delete_forum(self):
-        ForumRepository.delete_forum(self.f2)
-        with self.assertRaises(Http404):
-            ForumRepository.get_forum_by_id(self.f2.id)
+        # Pastikan forum masih ada sebelum dihapus
+        self.assertTrue(Forum.objects.filter(id=self.f1.id).exists())
+
+        # Hapus forum
+        ForumRepository.delete_forum(self.f1)
+
+        # Pastikan forum sudah tidak ada
+        self.assertFalse(Forum.objects.filter(id=self.f1.id).exists())
+
+        # Forum lainnya tidak terhapus
+        self.assertTrue(Forum.objects.filter(id=self.f2.id).exists())
 
     # ---------- voting operations ----------
     def test_vote_operations(self):
