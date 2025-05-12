@@ -423,3 +423,46 @@ class ForumAPITest(TestCase):
         else:
             # If it's 401 from JWT, that's also acceptable
             self.assertEqual(response.json(), {"detail": "Unauthorized"})
+
+    def test_forum_overview(self):
+        """
+        Test the forum_overview endpoint to ensure it returns the correct data.
+        """
+        # Buat beberapa forum
+        forum1 = ForumRepository.create_forum(
+            user=self.user, title="Forum 1", description="Description 1", tag="ikan"
+        )
+        forum2 = ForumRepository.create_forum(
+            user=self.user, title="Forum 2", description="Description 2", tag="kolam"
+        )
+
+        # Tambahkan vote untuk forum1
+        ForumRepository.upvote_forum(self.user, forum1)
+
+        # Panggil endpoint forum_overview
+        response = self._auth_get("/api/forum/forum_overview?limit=10&offset=0", self.token)
+        self.assertEqual(response.status_code, 200)
+
+        # Periksa hasil
+        results = response.json()
+        self.assertGreaterEqual(len(results), 2)
+
+        # Periksa data forum1
+        forum1_data = next((f for f in results if f["id"] == str(forum1.id)), None)
+        self.assertIsNotNone(forum1_data)
+        self.assertEqual(forum1_data["title"], "Forum 1")
+        self.assertEqual(forum1_data["description"], "Description 1")
+        self.assertEqual(forum1_data["tag"], "ikan")
+        self.assertEqual(forum1_data["upvotes"], 1)
+        self.assertIn("user_vote", forum1_data)  # Pastikan user_vote ada
+        self.assertEqual(forum1_data["user_vote"], "up")
+
+        # Periksa data forum2
+        forum2_data = next((f for f in results if f["id"] == str(forum2.id)), None)
+        self.assertIsNotNone(forum2_data)
+        self.assertEqual(forum2_data["title"], "Forum 2")
+        self.assertEqual(forum2_data["description"], "Description 2")
+        self.assertEqual(forum2_data["tag"], "kolam")
+        self.assertEqual(forum2_data["upvotes"], 0)
+        self.assertIn("user_vote", forum2_data)  # Pastikan user_vote ada
+        self.assertIsNone(forum2_data["user_vote"])
