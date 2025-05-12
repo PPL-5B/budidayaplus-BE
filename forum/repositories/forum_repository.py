@@ -77,19 +77,8 @@ class ForumRepository:
 
     @staticmethod
     def upvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'up'}
-        )
-    
-    @staticmethod
-    def downvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'down'}
-        )
+        ForumVote.objects.get_or_create(user=user, forum=forum)
+
 
     @staticmethod
     def cancel_vote(user: User, forum: Forum):
@@ -99,7 +88,6 @@ class ForumRepository:
     def get_vote_summary(forum: Forum) -> dict:
         return {
             'upvotes': forum.upvotes,
-            'downvotes': forum.downvotes,
         }
 
     @staticmethod
