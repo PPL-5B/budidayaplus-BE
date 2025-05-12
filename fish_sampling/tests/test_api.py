@@ -1,3 +1,4 @@
+import os
 import uuid
 from django.test import TestCase
 from django.contrib.auth.models import User
@@ -13,14 +14,13 @@ from fish_sampling.api import determine_fish_status, target_data
 
 class FishSamplingAPITest(TestCase):
     def setUp(self):
-        self.client = TestClient(router)
-
+        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123") 
         # Buat Supervisor
-        self.supervisor = User.objects.create_user(username='supervisor', password='password', is_staff=True)
+        self.supervisor = User.objects.create_user(username='supervisor', password=pwd, is_staff=True)
         self.supervisor_profile, _ = UserProfile.objects.get_or_create(user=self.supervisor)
 
         # Buat Worker dengan Supervisor
-        self.user = User.objects.create_user(username='userA', password='abc123')
+        self.user = User.objects.create_user(username='userA', password=pwd)
         self.worker = Worker.objects.create(user=self.user, assigned_supervisor=self.supervisor_profile)
 
         self.pond = Pond.objects.create(

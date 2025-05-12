@@ -9,6 +9,8 @@ from cycle.models import Cycle
 from cycle.signals import create_cycle_signal
 from user_profile.utils import get_supervisor
 
+not_found = "Siklus tidak ditemukan"
+
 
 class CycleService:
     @staticmethod
@@ -35,14 +37,14 @@ class CycleService:
         supervisor = get_supervisor(user)
         cycle = CycleRepo.get_active_cycle(supervisor)
         if cycle is None:
-            raise ValueError("Siklus tidak ditemukan")
+            raise ValueError(not_found)
         return cycle
 
     @staticmethod
     def get_cycle_by_id(id: str):
         cycle = CycleRepo.get_cycle_by_id(id)
         if cycle is None:
-            raise ValueError("Siklus tidak ditemukan")
+            raise ValueError(not_found)
         return cycle
 
     @staticmethod
@@ -65,6 +67,6 @@ class CycleService:
     def stop_cycle(cycle_id: str, supervisor: User):
         cycle = CycleRepo.get_cycle_by_id(cycle_id)
         if not cycle:
-            raise ValueError("Siklus tidak ditemukan")
+            raise ValueError(not_found)
         CycleRepo.stop_cycle(cycle_id)
         return cycle

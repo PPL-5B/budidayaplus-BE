@@ -16,13 +16,13 @@ class ForumCreateSchema(Schema):
     tag: str = Field(..., description="Tag must be one of: ikan, kolam, siklus, budidayaplus")
 
 
+
 class ForumReplySchema(Schema):
     id: UUID4
     user: UserSchema
     description: str
     timestamp: datetime
     title: Optional[str] = None
-    tag: str
 
 
 class ForumOutputSchema(Schema):
@@ -35,7 +35,6 @@ class ForumOutputSchema(Schema):
     parent_id: Optional[UUID4] = None
     replies: List[ForumReplySchema] = []
     upvotes: int
-    downvotes: int
 
 
 class ForumListSchema(Schema):
