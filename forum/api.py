@@ -2,7 +2,6 @@ from typing import List
 from ninja import Router, Query
 from ninja.responses import Response
 from uuid import UUID
-from django.contrib.auth.models import User
 from forum.models import ForumVote
 from forum.schemas import ForumUpdateSchema, ForumOutputSchema, ForumCreateSchema, ForumReplySchema
 from forum.repositories.forum_repository import ForumRepository
@@ -90,6 +89,36 @@ def get_forums_by_user(request):
     forums = ForumRepository.get_forums_by_user(request.user)
     return forums
 
+@router.get("/forum_overview", response=List[ForumOutputSchema], auth=JWTAuth())
+def forum_overview(request, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+    forums = ForumRepository.list_forums(limit=limit, offset=offset, parent_id=None)
+    forum_ids = [forum.id for forum in forums]
+
+    vote_summaries = ForumRepository.get_vote_summary(forum_ids)
+    user_votes = ForumVote.objects.filter(user=request.user, forum_id__in=forum_ids).values_list("forum_id", flat=True)
+
+    result = []
+    for forum in forums:
+        result.append({
+            "id": forum.id,
+            "user": {
+                "id": forum.user.id,
+                "username": forum.user.username, 
+                "first_name": forum.user.first_name,
+                "last_name": forum.user.last_name,
+            },
+            "title": forum.title,
+            "description": forum.description,
+            "tag": forum.tag,
+            "timestamp": forum.timestamp,
+            "parent_id": forum.parent.id if forum.parent else None,
+            "replies": [],
+            "upvotes": vote_summaries.get(forum.id, {}).get("upvotes", 0),
+            "user_vote": "up" if forum.id in user_votes else None,
+        })
+
+    return result
+
 from silk.profiling.profiler import silk_profile
 @silk_profile(name="Profiling Search Forum")
 @router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
@@ -172,7 +201,9 @@ def cancel_vote(request, forum_id: UUID):
 @router.get("/vote_summary/{forum_id}", auth=JWTAuth())
 def vote_summary(request, forum_id: UUID):
     forum = ForumRepository.get_forum_by_id(forum_id)
-    summary = ForumRepository.get_vote_summary(forum)
+    summary = ForumRepository.get_vote_summary([forum.id])
+
+    summary = summary.get(forum.id, {"upvotes": 0})
     
     user_vote = ForumVote.objects.filter(user=request.user, forum=forum).first()
     summary["user_vote"] = "up" if user_vote else None
