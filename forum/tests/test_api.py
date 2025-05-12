@@ -20,6 +20,42 @@ class ForumExtraAPITestCase(TestCase):
             user=self.user, title="Forum A", description="First forum", tag="ikan"
         )
         self.forum_id = str(self.forum.id)
+        self.user_token = str(RefreshToken.for_user(self.user).access_token)
+        self.other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
+
+    def _authenticated_post(self, url, data, token):
+        """Helper to make an authenticated POST request with JSON data."""
+        return self.client.post(
+            url,
+            data=json.dumps(data),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+    
+    def _authenticated_put(self, url, data, token):
+        """Helper to make an authenticated PUT request with JSON data."""
+        return self.client.put(
+            url,
+            data=json.dumps(data),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+    
+    def _authenticated_delete(self, url, token):
+        """Helper to make an authenticated DELETE request."""
+        return self.client.delete(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+
+    def _authenticated_get(self, url, token):
+        """Helper to make an authenticated GET request."""
+        return self.client.get(
+            url,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
 
     def _auth_get(self, url, token):
         return self.client.get(url, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
@@ -32,6 +68,20 @@ class ForumExtraAPITestCase(TestCase):
 
     def _auth_delete(self, url, token):
         return self.client.delete(url, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+
+    def test_create_and_reply(self):
+        ok = self._req(
+            "POST",
+            "/api/forum/create_reply",
+            token=self.user_token,
+            body={
+                "description": "Ini reply",
+                "parent_id": self.forum_id,
+                "tag": "ikan"
+            }
+        )
+        self.assertEqual(ok.status_code, 200)
 
     # Existing test cases
     def test_upvote_and_cancel_vote(self):
@@ -113,6 +163,7 @@ class ForumExtraAPITestCase(TestCase):
             "tag": "ikan",
             "parent_id": str(uuid.uuid4())  # random UUID, not exist
         }
+
         res = self._auth_post("/api/forum/create", data, self.token)
         self.assertEqual(res.status_code, 400)
         self.assertIn("Invalid parent forum ID", res.json()["error"])
@@ -166,6 +217,7 @@ class ForumExtraAPITestCase(TestCase):
         ForumRepository.create_forum(
             user=self.user, title="", description="Balasan", tag="kolam", parent=self.forum
         )
+        
         res = self._auth_get(f"/api/forum/get_replies/{self.forum_id}", self.token)
         self.assertEqual(res.status_code, 200)
         self.assertGreaterEqual(len(res.json()), 1)
@@ -236,6 +288,95 @@ class ForumExtraAPITestCase(TestCase):
         self.assertEqual(response.json()["id"], self.forum_id)
         self.assertEqual(response.json()["title"], "Forum A")
 
+    def test_update_forum_not_owned(self):
+        """Test updating a forum post not owned by the user."""
+        update_data = {
+            "description": "Unauthorized update",
+            "tag": "siklus"
+        }
+        response = self._authenticated_put(f"/api/forum/{self.forum_id}", update_data, self.other_user_token)
+        self.assertEqual(response.status_code, 403)
+
+    def test_update_forum_not_found(self):
+        """Test updating a non-existent forum."""
+        update_data = {
+            "title": "Updated Title",
+            "description": "Updated description",
+            "tag": "budidayaplus"
+        }
+        response = self._authenticated_put(f"/api/forum/{uuid.uuid4()}", update_data, self.user_token)
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_user_votes_unauthenticated(self):
+        """Test getting user votes without authentication."""
+        response = self.client.get("/api/forum/user_votes")
+        self.assertEqual(response.status_code, 401)
+
+    def test_search_forums_success(self):
+        """Test searching forums successfully."""
+        # Create a forum with unique text
+        ForumRepository.create_forum(
+            user=self.user,
+            title="Unique Search Term",
+            description="This should be found",
+            tag="ikan"
+        )
+        
+        response = self._authenticated_get("/api/forum/search?query=Unique", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        results = response.json()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Unique Search Term")
+
+    def test_search_forums_empty_query(self):
+        """Test searching with empty query."""
+        response = self._authenticated_get("/api/forum/search?query=", self.user_token)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_search_forums_no_results(self):
+        """Test searching with no matching results."""
+        response = self._authenticated_get("/api/forum/search?query=NoSuchTerm", self.user_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 0)
+
+    def test_direct_unauthorized_branches(self):
+        """
+        Panggil handler secara langsung dengan AnonymousUser agar baris
+        'return Response(..., 403)' ter-eksekusi (create & get_by_user).
+        """
+        fake_request = SimpleNamespace(user=AnonymousUser())
+
+        # ---- create_forum (parent None, title ada) → expected 403 ----
+        payload = ForumCreateSchema(
+            title="Judul",
+            description="Desc",
+            tag="ikan",
+        )
+        resp = create_forum(fake_request, payload)
+        self.assertEqual(resp.status_code, 403)
+
+        # ---- get_forums_by_user → expected 403 ----
+        resp2 = get_forums_by_user(fake_request)
+        self.assertEqual(resp2.status_code, 403)
+
+    def test_update_forum_exception_handling(self):
+        """Test exception handling in the update_forum endpoint."""
+        # Mock the repository to raise an exception
+        with patch('forum.repositories.forum_repository.ForumRepository.update_forum_by_id') as mock_update:
+            mock_update.side_effect = Exception("Test error")
+            
+            update_data = {
+                "title": "Updated Title",
+                "description": "Updated description",
+                "tag": "budidayaplus"
+            }
+            response = self._authenticated_put(f"/api/forum/update/{self.forum_id}", update_data, self.user_token)
+            
+            self.assertEqual(response.status_code, 500)
+            self.assertIn("error", response.json())
+            self.assertEqual(response.json()["error"], "Test error")
+
     def test_get_latest_forum_empty(self):
         """Test when no forums exist"""
         # Delete all forums
@@ -275,4 +416,3 @@ class ForumExtraAPITestCase(TestCase):
         else:
             # If it's 401 from JWT, that's also acceptable
             self.assertEqual(response.json(), {"detail": "Unauthorized"})
-    

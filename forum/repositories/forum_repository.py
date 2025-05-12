@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 from typing import Optional, List
 from django.shortcuts import get_object_or_404
@@ -64,17 +65,13 @@ class ForumRepository:
         return list(forum.replies.all())
 
     @staticmethod
-    def update_forum(forum_id: UUID, title: str, description: str) -> Forum:
-
+    def update_forum_by_id(forum_id: UUID, title: str, description: str) -> Forum:
         forum = get_object_or_404(Forum, id=forum_id)
-        if title is not None:
-            forum.title = title
-        if description is not None:
-            forum.description = description
-
+        forum.title = title
+        forum.description = description
         forum.save()
         return forum
-
+    
     @staticmethod
     def upvote_forum(user: User, forum: Forum):
         ForumVote.objects.get_or_create(user=user, forum=forum)
