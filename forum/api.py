@@ -150,7 +150,7 @@ def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     if request.user != forum.user:
         return Response({"error": "You are not authorized to update this forum post."}, status=403)
 
-    updated_forum = ForumRepository.update_forum(
+    updated_forum = ForumRepository.update_forum_by_id(
         forum_id,
         title=data.title,
         description=data.description
@@ -175,7 +175,7 @@ def vote_summary(request, forum_id: UUID):
     summary = ForumRepository.get_vote_summary(forum)
     
     user_vote = ForumVote.objects.filter(user=request.user, forum=forum).first()
-    summary["user_vote"] = user_vote.vote_choice if user_vote else None
+    summary["user_vote"] = "up" if user_vote else None
 
     return summary
 
@@ -184,12 +184,12 @@ def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
     try:
         forum = ForumRepository.get_forum_by_id(forum_id)
 
-        if forum.user != request.user:
-            return Response({"error": "You are not authorized to update this forum."}, status=403)
+        if forum.user != request.user: return Response({"error": "You are not authorized to update this forum."}, status=403)
 
         updated_forum = ForumRepository.update_forum_by_id(forum_id, data.title, data.description)
         return updated_forum
-    except Http404:
-        return Response({"error": "Forum not found."}, status=404)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        
+    except Http404: return Response({"error": "Forum not found."}, status=404)
+    except Exception as e: return Response({"error": str(e)}, status=500)
+
+

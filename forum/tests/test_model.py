@@ -37,8 +37,7 @@ class ForumModelTest(TestCase):
         self.assertEqual(post.upvotes, 1)
 
         # Create vote from another user
-        random_password = self.generate_random_password()
-        user2 = User.objects.create_user("u22", password=random_password)
+        user2 = User.objects.create_user("u22", password=self.test_password)
         ForumVote.objects.create(user=user2, forum=post)
         self.assertEqual(post.upvotes, 2)
 

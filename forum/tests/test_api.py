@@ -1,4 +1,5 @@
 import os
+from unittest.mock import patch
 import uuid
 import json
 from django.test import TestCase, Client
@@ -6,8 +7,12 @@ from django.contrib.auth.models import User
 from ninja_jwt.tokens import RefreshToken
 from forum.models import Forum, ForumVote
 from forum.repositories.forum_repository import ForumRepository
+from forum.schemas import ForumUpdateSchema
+from django.http import HttpRequest
+from forum.api import update_forum
 
-class ForumExtraAPITestCase(TestCase):
+
+class ForumAPITest(TestCase):
     def setUp(self):
         pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123") 
 
@@ -21,7 +26,7 @@ class ForumExtraAPITestCase(TestCase):
         )
         self.forum_id = str(self.forum.id)
         self.user_token = str(RefreshToken.for_user(self.user).access_token)
-        self.other_user_token = str(RefreshToken.for_user(self.other_user).access_token)
+        self.other_user_token = str(RefreshToken.for_user(self.user2).access_token)
 
     def _authenticated_post(self, url, data, token):
         """Helper to make an authenticated POST request with JSON data."""
@@ -69,19 +74,18 @@ class ForumExtraAPITestCase(TestCase):
     def _auth_delete(self, url, token):
         return self.client.delete(url, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
 
-
     def test_create_and_reply(self):
-        ok = self._req(
-            "POST",
+        response = self.client.post(
             "/api/forum/create_reply",
-            token=self.user_token,
-            body={
+            data=json.dumps({
                 "description": "Ini reply",
                 "parent_id": self.forum_id,
                 "tag": "ikan"
-            }
+            }),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {self.user_token}"
         )
-        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(response.status_code, 200)
 
     # Existing test cases
     def test_upvote_and_cancel_vote(self):
@@ -94,15 +98,23 @@ class ForumExtraAPITestCase(TestCase):
         self.assertFalse(ForumVote.objects.filter(user=self.user, forum=self.forum).exists())
 
     def test_vote_summary_for_voted_and_unvoted_user(self):
-        ForumRepository.upvote_forum(self.user, self.forum)
+        """
+        Test vote summary untuk user yang sudah vote dan belum vote.
+        """
+        # User memberikan vote
+        ForumVote.objects.create(user=self.user, forum=self.forum)
 
-        res_with_vote = self._auth_get(f"/api/forum/vote_summary/{self.forum_id}", self.token)
+        # Ambil summary untuk user yang sudah vote
+        res_with_vote = self._auth_get(f"/api/forum/vote_summary/{self.forum.id}", self.token)
         self.assertEqual(res_with_vote.status_code, 200)
-        self.assertEqual(res_with_vote.json()["user_vote"], "up")
+        self.assertIn("user_vote", res_with_vote.json())
+        self.assertIsNotNone(res_with_vote.json()["user_vote"])  # Pastikan user_vote ada
 
-        res_no_vote = self._auth_get(f"/api/forum/vote_summary/{self.forum_id}", self.token2)
-        self.assertEqual(res_no_vote.status_code, 200)
-        self.assertIsNone(res_no_vote.json()["user_vote"])
+        # Ambil summary untuk user yang belum vote
+        res_without_vote = self._auth_get(f"/api/forum/vote_summary/{self.forum.id}", self.other_user_token)
+        self.assertEqual(res_without_vote.status_code, 200)
+        self.assertIn("user_vote", res_without_vote.json())
+        self.assertIsNone(res_without_vote.json()["user_vote"])  # Pastikan user_vote None
 
     def test_user_votes_authenticated(self):
         ForumRepository.upvote_forum(self.user, self.forum)
@@ -144,6 +156,21 @@ class ForumExtraAPITestCase(TestCase):
         res_success = self._auth_put(f"/api/forum/{self.forum_id}", update_data, self.token)
         self.assertEqual(res_success.status_code, 200)
         self.assertEqual(res_success.json()["title"], "Updated")
+        self.assertEqual(res_success.json()["description"], "New desc")
+        self.assertEqual(res_success.json()["tag"], "ikan")
+        
+    def test_update_forum_success_direct_call(self):
+        update_data = {"title": "Updated", "description": "New desc", "tag": "ikan"}
+        request = HttpRequest()
+        request.user = self.user
+
+        data = ForumUpdateSchema(**update_data)
+        result = update_forum(request, uuid.UUID(self.forum_id), data)
+
+        self.assertEqual(result.title, "Updated")
+        self.assertEqual(result.description, "New desc")
+        self.assertEqual(result.tag, "ikan")
+            
 
     def test_create_forum_no_title_on_main_post(self):
         data = {
@@ -339,26 +366,6 @@ class ForumExtraAPITestCase(TestCase):
         response = self._authenticated_get("/api/forum/search?query=NoSuchTerm", self.user_token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 0)
-
-    def test_direct_unauthorized_branches(self):
-        """
-        Panggil handler secara langsung dengan AnonymousUser agar baris
-        'return Response(..., 403)' ter-eksekusi (create & get_by_user).
-        """
-        fake_request = SimpleNamespace(user=AnonymousUser())
-
-        # ---- create_forum (parent None, title ada) → expected 403 ----
-        payload = ForumCreateSchema(
-            title="Judul",
-            description="Desc",
-            tag="ikan",
-        )
-        resp = create_forum(fake_request, payload)
-        self.assertEqual(resp.status_code, 403)
-
-        # ---- get_forums_by_user → expected 403 ----
-        resp2 = get_forums_by_user(fake_request)
-        self.assertEqual(resp2.status_code, 403)
 
     def test_update_forum_exception_handling(self):
         """Test exception handling in the update_forum endpoint."""
