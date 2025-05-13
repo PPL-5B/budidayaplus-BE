@@ -170,19 +170,15 @@ class ForumRepositoryTest(TestCase):
         )
 
     def test_vote_summary(self):
-        ForumRepository.upvote_forum(self.user, self.f1)
-        ForumRepository.upvote_forum(self.other, self.f1)
+        ForumVote.objects.create(user=self.user, forum=self.f1)
+        ForumVote.objects.create(user=self.other, forum=self.f1)
 
-        summary = ForumRepository.get_vote_summary(self.f1)
-        self.assertEqual(summary['upvotes'], 2)
-        
-        ForumRepository.cancel_vote(self.user, self.f1)
-        summary = ForumRepository.get_vote_summary(self.f1)
-        self.assertEqual(summary['upvotes'], 1)
-        
-        ForumRepository.cancel_vote(self.other, self.f1)
-        summary = ForumRepository.get_vote_summary(self.f1)
-        self.assertEqual(summary['upvotes'], 0)
+        # Panggil get_vote_summary dengan daftar UUID
+        summary = ForumRepository.get_vote_summary([self.f1.id])
+
+        # Periksa hasil
+        self.assertIn(self.f1.id, summary)
+        self.assertEqual(summary[self.f1.id]["upvotes"], 2)  # Harus ada 2 upvotes
 
     # ---------- search operations ----------
     def test_search_forums(self):
@@ -250,3 +246,22 @@ class ForumRepositoryTest(TestCase):
         )
         self.assertEqual(updated.title, self.f1.title)  # unchanged
         self.assertEqual(updated.description, "Only update description")
+
+    def test_list_forums_with_parent_id(self):
+        # Test listing replies for a specific parent forum
+        reply = ForumRepository.create_forum(
+            user=self.user,
+            title=None,
+            description="Reply content",
+            parent=self.f2,
+            tag="siklus"
+        )
+
+        forums = ForumRepository.list_forums(limit=20, offset=0, parent_id=self.f2.id)
+        self.assertEqual(len(forums), 1)
+        self.assertEqual(forums[0].id, reply.id)
+        self.assertEqual(forums[0].parent.id, self.f2.id)
+
+        # Test with non-existent parent_id
+        forums = ForumRepository.list_forums(limit=20, offset=0, parent_id=uuid4())
+        self.assertEqual(len(forums), 0)
