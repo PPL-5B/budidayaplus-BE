@@ -93,9 +93,9 @@ def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str)
 
 @silk_profile(name="Get Latest Pond Quality")
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: PondQualityOutput})
-def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
+def get_latest_pond_quality(request, cycle_id: str):
     cycle = get_object_or_404(Cycle, id=cycle_id)
-    pond = get_object_or_404(Pond, pond_id=pond_id)
+    pond = get_object_or_404(Pond)
     supervisor = get_supervisor(user=request.auth)
 
     # 🔹 Pindahkan validasi user sebelum mencoba mengambil data
