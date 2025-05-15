@@ -24,6 +24,14 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for diff-cover
+
+    # If pull request, fetch target branch for diff coverage
+    - name: Fetch base branch for PRs
+      if: github.event_name == 'pull_request'
+      run: |
+        git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
 
     - name: Set up Python 3.12
       uses: actions/setup-python@v4
@@ -34,7 +42,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install coverage
+        pip install coverage diff-cover
 
     - name: Configure Database
       run: |
@@ -80,6 +88,42 @@ jobs:
       run: |
         coverage xml || echo "Failed to generate coverage.xml"
 
+    # Check coverage threshold for new code only
+    - name: Check New Code Coverage Threshold
+      id: coverage_check
+      if: github.event_name == 'pull_request' && github.base_ref == 'dev'
+      run: |
+        COVERAGE_THRESHOLD=90
+        
+        # Generate diff-cover report against base branch
+        diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --html-report=diff_coverage_report.html
+        
+        # Extract new code coverage percentage
+        NEW_CODE_COVERAGE=$(diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} | grep "Coverage: " | sed 's/Coverage: \([0-9.]*\)%.*/\1/')
+        
+        echo "New code coverage percentage: $NEW_CODE_COVERAGE%"
+        echo "coverage_percent=$NEW_CODE_COVERAGE" >> $GITHUB_OUTPUT
+        
+        # Check if coverage meets threshold
+        if (( $(echo "$NEW_CODE_COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
+          echo "❌ New code coverage is below the required threshold of $COVERAGE_THRESHOLD% (Current: $NEW_CODE_COVERAGE%)"
+          echo "coverage_status=failed" >> $GITHUB_OUTPUT
+        else
+          echo "✅ New code coverage meets the required threshold of $COVERAGE_THRESHOLD% (Current: $NEW_CODE_COVERAGE%)"
+          echo "coverage_status=success" >> $GITHUB_OUTPUT
+        fi
+    
+    # Create a GitHub status check for coverage (now checking new code only)
+    - name: Create Coverage Status Check
+      if: github.event_name == 'pull_request' && github.base_ref == 'dev'
+      run: |
+        if [[ "${{ steps.coverage_check.outputs.coverage_status }}" == "failed" ]]; then
+          echo "::error::Coverage below threshold: Required 90%, Current ${{ steps.coverage_check.outputs.coverage_percent }}%"
+          exit 1
+        else
+          echo "✅ Coverage meets threshold: Required 90%, Current ${{ steps.coverage_check.outputs.coverage_percent }}%"
+        fi
+
     # Debug: Check if coverage.xml was created
     - name: Debug - Check if coverage.xml file exists
       run: |
@@ -96,7 +140,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
-        path: coverage.xml
+        path: |
+          coverage.xml
+          diff_coverage_report.html
 
   sonarcloud:
     needs: build-test

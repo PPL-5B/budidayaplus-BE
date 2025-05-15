@@ -63,8 +63,7 @@ class ForumSchemaTest(TestCase):
             user=self.user,
             title="Reply Judul Forum",
             description="Balasan",
-            parent=post,
-            tag="kolam"
+            parent=post
         )
 
         udata = {
@@ -88,17 +87,14 @@ class ForumSchemaTest(TestCase):
                     "user": udata,
                     "title": reply.title,
                     "description": reply.description,
-                    "tag": reply.tag,
                     "timestamp": reply.timestamp,
                 }
             ],
             "upvotes": 0,
-            "downvotes": 0,
         }
         out = ForumOutputSchema(**payload)
         self.assertEqual(out.replies[0].title, "Reply Judul Forum")
         self.assertEqual(out.tag, "ikan")
-        self.assertEqual(out.replies[0].tag, "kolam")
 
         # List
         lst = ForumListSchema(forums=[payload])

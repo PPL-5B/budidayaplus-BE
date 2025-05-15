@@ -129,10 +129,10 @@ SIMPLE_JWT = {
 }
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -145,7 +145,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://dkn-budidayaplus-staging.vercel.app",
     "http://localhost:8080",
     "http://127.0.0.1:8000",
-    "https://budidayaplus-fe-alpha.vercel.app"
+    "https://budidayaplus-fe-alpha.vercel.app",
+    "http://localhost:3000", 
 ]
 
 CORS_ALLOW_METHODS = [
@@ -167,6 +168,12 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'x-csrftoken',
+]
+
+CORS_EXPOSE_HEADERS = [
+    'content-type',
+    'x-csrftoken',
 ]
 
 ROOT_URLCONF = 'budidayaplus.urls'
@@ -258,23 +265,11 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Sentry
 import sentry_sdk
 
 sentry_sdk.init(
-    dsn="https://d53d83da381b3e92d55a2f9399859789@o4509004052627456.ingest.de.sentry.io/4509004056428624",
+    dsn="https://72d0c6a3b65589784965fc4a1e3dfcc9@o4509308336406528.ingest.us.sentry.io/4509308353183744",
     # Add data like request headers and IP for users,
     # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
     send_default_pii=True,
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for tracing.
-    traces_sample_rate=1.0,
-    _experiments={
-        # Set continuous_profiling_auto_start to True
-        # to automatically start the profiler on when
-        # possible.
-        "continuous_profiling_auto_start": True,
-    },
 )
-
-SILKY_PYTHON_PROFILER = True

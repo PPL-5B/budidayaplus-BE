@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 from typing import Optional, List
 from django.shortcuts import get_object_or_404
@@ -5,8 +6,6 @@ from forum.models import Forum, ForumVote
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
-
-
 
 class ForumRepository:
     @staticmethod
@@ -37,9 +36,17 @@ class ForumRepository:
         forum.delete()
 
     @staticmethod
-    def list_forums(limit=20, offset=0):
-        return Forum.objects.select_related("user") \
-            .order_by("-timestamp")[offset:offset + limit]
+    def list_forums(limit=20, offset=0, parent_id: Optional[UUID] = None):
+        """
+        Mengambil daftar forum dengan pagination dan filter parent_id.
+        Jika parent_id=None, hanya forum utama yang diambil.
+        """
+        query = Forum.objects.select_related("user")
+        if parent_id is None:
+            query = query.filter(parent__isnull=True)  # Hanya forum utama
+        else:
+            query = query.filter(parent_id=parent_id)  # Hanya balasan untuk forum tertentu
+        return query.order_by("-timestamp")[offset:offset + limit]
     
     @staticmethod
     def get_forums_by_user(user: User) -> List[Forum]:
@@ -64,43 +71,28 @@ class ForumRepository:
         return list(forum.replies.all())
 
     @staticmethod
-    def update_forum(forum_id: UUID, title: str, description: str) -> Forum:
-
+    def update_forum_by_id(forum_id: UUID, title: str, description: str) -> Forum:
         forum = get_object_or_404(Forum, id=forum_id)
-        if title is not None:
-            forum.title = title
-        if description is not None:
-            forum.description = description
-
+        forum.title = title
+        forum.description = description
         forum.save()
         return forum
-
-    @staticmethod
-    def upvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'up'}
-        )
     
     @staticmethod
-    def downvote_forum(user: User, forum: Forum):
-        ForumVote.objects.update_or_create(
-            user=user,
-            forum=forum,
-            defaults={'vote_choice': 'down'}
-        )
+    def upvote_forum(user: User, forum: Forum):
+        ForumVote.objects.get_or_create(user=user, forum=forum)
 
     @staticmethod
     def cancel_vote(user: User, forum: Forum):
         ForumVote.objects.filter(user=user, forum=forum).delete()
 
     @staticmethod
-    def get_vote_summary(forum: Forum) -> dict:
-        return {
-            'upvotes': forum.upvotes,
-            'downvotes': forum.downvotes,
-        }
+    def get_vote_summary(forum_ids: List[UUID]) -> dict:
+        """
+        Returns a summary of votes for a list of forums.
+        """
+        votes = ForumVote.objects.filter(forum_id__in=forum_ids).values("forum_id").annotate(upvotes=models.Count("id"))
+        return {vote["forum_id"]: {"upvotes": vote["upvotes"]} for vote in votes}
 
     @staticmethod
     def search_forums(query: str) -> List[Forum]:
