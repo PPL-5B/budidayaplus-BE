@@ -7,10 +7,9 @@ from cycle.models import Cycle
 from fish_death.repositories.fish_death_repository import FishDeathRepository
 
 class FishDeathRepositoryTest(TestCase):
-    
     def setUp(self):
-        date_now = datetime.now()
-        start_date = date_now - timedelta(days=30)
+        self.now = datetime.now()
+        start_date = self.now - timedelta(days=30)
         end_date = start_date + timedelta(days=60)
 
         self.user = User.objects.create_user(username='081234567890', password='password')
@@ -31,63 +30,73 @@ class FishDeathRepositoryTest(TestCase):
             pond=self.pond,
             reporter=self.user,
             cycle=self.cycle,
-            recorded_at=datetime.now(),
-            fish_death_count = 10,
-            fish_alive_count = 90,
+            recorded_at=self.now,
+            fish_death_count=10,
+            fish_alive_count=90,
         )
 
     def test_get_pond(self):
+        """Should return correct pond by pond_id"""
         pond = FishDeathRepository.get_pond(self.pond.pond_id)
         self.assertEqual(pond, self.pond)
-    
+
     def test_get_cycle(self):
+        """Should return correct cycle by ID"""
         cycle = FishDeathRepository.get_cycle(self.cycle.id)
         self.assertEqual(cycle, self.cycle)
 
     def test_get_reporter(self):
+        """Should return correct reporter by user ID"""
         reporter = FishDeathRepository.get_reporter(self.user.id)
         self.assertEqual(reporter, self.user)
-    
+
     def test_get_existing_fish_death(self):
-        existing_fish_death = FishDeathRepository.get_existing_fish_death(
+        """Should return fish death record for today"""
+        existing = FishDeathRepository.get_existing_fish_death(
             cycle=self.cycle,
             pond=self.pond,
-            today=datetime.now().date()
+            today=self.now.date()
         )
-        self.assertEqual(existing_fish_death, self.fish_death)
-    
+        self.assertEqual(existing, self.fish_death)
+
     def test_create_fish_death(self):
+        """Should create new fish death record"""
         new_fish_death = FishDeathRepository.create_fish_death(
             pond=self.pond,
             reporter=self.user,
             cycle=self.cycle,
-            recorded_at=datetime.now(),
-            fish_death_count = 20,
-            fish_alive_count = 110,
+            recorded_at=self.now,
+            fish_death_count=20,
+            fish_alive_count=110,
         )
         self.assertIsNotNone(new_fish_death)
         self.assertEqual(new_fish_death.fish_death_count, 20)
         self.assertEqual(new_fish_death.fish_alive_count, 110)
-    
+
     def test_delete_fish_death(self):
+        """Should delete existing fish death record"""
         FishDeathRepository.delete_fish_death(self.fish_death)
         with self.assertRaises(FishDeath.DoesNotExist):
             FishDeath.objects.get(id=self.fish_death.id)
 
     def test_get_fish_death_by_id(self):
-        fish_death = FishDeathRepository.get_fish_death_by_id(self.fish_death.id)
-        self.assertEqual(fish_death, self.fish_death)
-    
+        """Should return fish death by ID"""
+        result = FishDeathRepository.get_fish_death_by_id(self.fish_death.id)
+        self.assertEqual(result, self.fish_death)
+
     def test_get_latest_fish_death(self):
-        latest_sampling = FishDeathRepository.get_latest_fish_death(self.pond, self.cycle)
-        self.assertEqual(latest_sampling, self.fish_death)
+        """Should return latest fish death record"""
+        latest = FishDeathRepository.get_latest_fish_death(self.pond, self.cycle)
+        self.assertEqual(latest, self.fish_death)
 
     def test_list_fish_deaths(self):
-        samplings = FishDeathRepository.list_fish_deaths(self.cycle, self.pond)
-        self.assertEqual(len(samplings), 1)
-        self.assertEqual(samplings[0], self.fish_death)
+        """Should return list of fish death records"""
+        results = FishDeathRepository.list_fish_deaths(self.cycle, self.pond)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0], self.fish_death)
 
     def test_get_latest_fish_death_no_result(self):
+        """Should return None if no fish death record found"""
         self.fish_death.delete()
-        latest_sampling = FishDeathRepository.get_latest_fish_death(self.pond, self.cycle)
-        self.assertIsNone(latest_sampling)
+        latest = FishDeathRepository.get_latest_fish_death(self.pond, self.cycle)
+        self.assertIsNone(latest)
