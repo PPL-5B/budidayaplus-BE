@@ -83,7 +83,6 @@ def create_fish_sampling(request, pond_id: str, cycle_id: str, payload: FishSamp
         "reporter": {"id": fish_sampling.reporter.id},
         "fish_weight": fish_sampling.fish_weight,
         "fish_length": fish_sampling.fish_length,
-        "fish_dead": fish_sampling.fish_dead,
         "recorded_at": fish_sampling.recorded_at.isoformat(),
     }
 
