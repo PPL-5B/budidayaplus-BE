@@ -1,11 +1,11 @@
 import uuid
 import json
-from datetime import datetime, timedelta
 from django.test import TestCase
-from django.utils.timezone import make_aware
 from django.contrib.auth.models import User
 from ninja.testing import TestClient
 from rest_framework_simplejwt.tokens import AccessToken
+from datetime import datetime, timedelta
+from django.utils.timezone import make_aware
 
 from pond.models import Pond
 from cycle.models import Cycle, PondFishAmount
@@ -16,16 +16,16 @@ from user_profile.models import UserProfile, Worker
 class FishDeathAPITest(TestCase):
     def setUp(self):
         self.client = TestClient(router)
-        self.now = make_aware(datetime.now())
-        self.today = self.now.date()
 
-        # Users and profiles
+        # Create a supervisor and its profile
         self.supervisor = User.objects.create_user(username='supervisor', password='password', is_staff=True)
         self.supervisor_profile, _ = UserProfile.objects.get_or_create(user=self.supervisor)
+
+        # Create a worker assigned to the supervisor
         self.user = User.objects.create_user(username='worker', password='password')
         self.worker = Worker.objects.create(user=self.user, assigned_supervisor=self.supervisor_profile)
 
-        # Pond and cycle
+        # Create a pond (owner is supervisor)
         self.pond = Pond.objects.create(
             owner=self.supervisor,
             name='Test Pond',
@@ -34,48 +34,62 @@ class FishDeathAPITest(TestCase):
             width=5.0,
             depth=2.0
         )
+
+        # Create an active cycle (today is between start_date and end_date)
+        today = datetime.now().date()
         self.cycle = Cycle.objects.create(
             supervisor=self.supervisor,
-            start_date=self.today - timedelta(days=1),
-            end_date=self.today + timedelta(days=1)
+            start_date=today - timedelta(days=1),
+            end_date=today + timedelta(days=1)
         )
 
+        # Create an initial fish death record for testing GET latest
         self.fish_death = FishDeath.objects.create(
             pond=self.pond,
             reporter=self.user,
             cycle=self.cycle,
-            recorded_at=self.now,
+            recorded_at=make_aware(datetime.now()),
             fish_death_count=5,
             fish_alive_count=100
         )
 
+        # Generate a token for authentication
         self.token = str(AccessToken.for_user(self.user))
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
-    def _make_url(self, pond_id=None, cycle_id=None, suffix=''):
-        """Utility method to generate API URL."""
-        pond_id = pond_id or self.pond.pond_id
-        cycle_id = cycle_id or self.cycle.id
-        return f'/{pond_id}/{cycle_id}/{suffix}'
-
     def test_create_fish_death(self):
-        """Should create a new fish death record with default alive count 0 (no PondFishAmount)"""
-        url = self._make_url()
+        """
+        Test creating a new fish death record.
+        The payload only contains fish_death_count; the API should fill in recorded_at and fish_alive_count
+        (defaulting to 0 when no PondFishAmount exists).
+        """
+        url = f'/{self.pond.pond_id}/{self.cycle.id}/'
         payload = {"fish_death_count": 7}
-        response = self.client.post(url, data=json.dumps(payload), content_type="application/json", headers=self.headers)
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers=self.headers
+        )
         self.assertEqual(response.status_code, 200, response.json())
         data = response.json()
+        self.assertIn("id", data)
         self.assertEqual(data["fish_death_count"], 7)
-        self.assertEqual(data["fish_alive_count"], 0)
+        self.assertEqual(data["fish_alive_count"], 0)  # Default value since no PondFishAmount exists
         self.assertEqual(data["pond_id"], str(self.pond.pond_id))
         self.assertEqual(data["cycle_id"], str(self.cycle.id))
         self.assertTrue(data["recorded_at"])
 
     def test_create_fish_death_invalid_count(self):
-        """Should return 400 if fish_death_count is negative"""
+        """
+        Test creating a fish death record with an invalid fish_death_count (e.g. a negative value).
+        The API should return a 400 error.
+        """
+        url = f'/{self.pond.pond_id}/{self.cycle.id}/'
+        payload = {"fish_death_count": -3}
         response = self.client.post(
-            self._make_url(),
-            data=json.dumps({"fish_death_count": -3}),
+            url,
+            data=json.dumps(payload),
             content_type="application/json",
             headers=self.headers
         )
@@ -83,16 +97,22 @@ class FishDeathAPITest(TestCase):
         self.assertIn("detail", response.json())
 
     def test_create_fish_death_cycle_not_active(self):
-        """Should return 400 if cycle is not active"""
-        inactive_cycle = Cycle.objects.create(
+        """
+        Test creating a fish death record when the cycle is not active.
+        The API should return a 400 error with a message indicating the cycle is inactive.
+        """
+        # Create a cycle that is not active (end date in the past)
+        past_date = datetime.now().date() - timedelta(days=10)
+        cycle_inactive = Cycle.objects.create(
             supervisor=self.supervisor,
-            start_date=self.today - timedelta(days=15),
-            end_date=self.today - timedelta(days=10)
+            start_date=past_date - timedelta(days=5),
+            end_date=past_date - timedelta(days=1)
         )
-        url = self._make_url(cycle_id=inactive_cycle.id)
+        url = f'/{self.pond.pond_id}/{cycle_inactive.id}/'
+        payload = {"fish_death_count": 5}
         response = self.client.post(
             url,
-            data=json.dumps({"fish_death_count": 5}),
+            data=json.dumps(payload),
             content_type="application/json",
             headers=self.headers
         )
@@ -100,21 +120,36 @@ class FishDeathAPITest(TestCase):
         self.assertEqual(response.json().get('detail'), "Siklus tidak aktif")
 
     def test_create_fish_death_with_existing_pond_fish_amount(self):
-        """Should use PondFishAmount as fish_alive_count if exists"""
+        """
+        Test creating a fish death record when a PondFishAmount record exists.
+        The fish_alive_count should be set to the fish_amount from that record.
+        """
+        pond_fish_amount_value = 150
         PondFishAmount.objects.create(
             pond=self.pond,
             cycle=self.cycle,
-            fish_amount=150
+            fish_amount=pond_fish_amount_value
         )
-        url = self._make_url()
+
+        url = f'/{self.pond.pond_id}/{self.cycle.id}/'
         payload = {"fish_death_count": 10}
-        response = self.client.post(url, data=json.dumps(payload), content_type="application/json", headers=self.headers)
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+            headers=self.headers
+        )
         self.assertEqual(response.status_code, 200, response.json())
-        self.assertEqual(response.json()["fish_alive_count"], 150)
+        data = response.json()
+        # Verify that fish_alive_count comes from the PondFishAmount record.
+        self.assertEqual(data["fish_alive_count"], pond_fish_amount_value)
 
     def test_get_latest_fish_death(self):
-        """Should return latest fish death record"""
-        response = self.client.get(self._make_url(suffix="latest/"), headers=self.headers)
+        """
+        Test retrieving the latest fish death record.
+        """
+        url = f'/{self.pond.pond_id}/{self.cycle.id}/latest/'
+        response = self.client.get(url, headers=self.headers)
         self.assertEqual(response.status_code, 200, response.json())
         data = response.json()
         self.assertEqual(data["fish_death_count"], self.fish_death.fish_death_count)
@@ -123,45 +158,59 @@ class FishDeathAPITest(TestCase):
         self.assertTrue(data["recorded_at"])
 
     def test_get_latest_fish_death_no_data(self):
-        """Should return 404 if no fish death exists"""
+        """
+        Test retrieving the latest fish death record when no record exists.
+        """
         FishDeath.objects.all().delete()
-        response = self.client.get(self._make_url(suffix="latest/"), headers=self.headers)
+        url = f'/{self.pond.pond_id}/{self.cycle.id}/latest/'
+        response = self.client.get(url, headers=self.headers)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json().get('detail'), 'Data tidak ditemukan')
 
     def test_get_latest_fish_death_cycle_not_active(self):
-        """Should return 400 if cycle is inactive"""
-        inactive_cycle = Cycle.objects.create(
+        """
+        Test retrieving the latest fish death record for a cycle that is not active.
+        """
+        past_date = datetime.now().date() - timedelta(days=90)
+        cycle_inactive = Cycle.objects.create(
             supervisor=self.supervisor,
-            start_date=self.today - timedelta(days=100),
-            end_date=self.today - timedelta(days=50)
+            start_date=past_date - timedelta(days=10),
+            end_date=past_date - timedelta(days=5)
         )
-        url = self._make_url(cycle_id=inactive_cycle.id, suffix="latest/")
+        url = f'/{self.pond.pond_id}/{cycle_inactive.id}/latest/'
         response = self.client.get(url, headers=self.headers)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json().get('detail'), 'Data tidak ditemukan')
 
     def test_get_fish_death_invalid_pond(self):
-        """Should return 404 if pond id does not exist"""
+        """
+        Test GET latest with an invalid pond id.
+        """
         invalid_pond_id = str(uuid.uuid4())
-        url = self._make_url(pond_id=invalid_pond_id, suffix="latest/")
+        url = f'/{invalid_pond_id}/{self.cycle.id}/latest/'
         response = self.client.get(url, headers=self.headers)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json().get('detail'), 'Not Found')
 
     def test_list_fish_deaths_unauthorized(self):
-        """Should return 401 when no token is provided"""
+        """
+        Test listing fish death records without proper authentication.
+        """
         url = f'/{self.pond.pond_id}/'
-        response = self.client.get(url)
+        response = self.client.get(url, headers={})
         self.assertEqual(response.status_code, 401)
 
     def test_list_fish_deaths(self):
-        """Should return list of fish death records"""
+        """
+        Test listing fish death records.
+        Create an additional record and verify that the list endpoint returns both records.
+        """
+        # Create an extra fish death record
         FishDeath.objects.create(
             pond=self.pond,
             reporter=self.user,
             cycle=self.cycle,
-            recorded_at=self.now,
+            recorded_at=make_aware(datetime.now()),
             fish_death_count=8,
             fish_alive_count=90
         )
@@ -170,5 +219,6 @@ class FishDeathAPITest(TestCase):
         self.assertEqual(response.status_code, 200, response.json())
         data = response.json()
         self.assertIn("fish_deaths", data)
+        # Expect at least 2 records (one from setUp and the extra one)
         self.assertGreaterEqual(len(data["fish_deaths"]), 2)
         self.assertEqual(data["cycle_id"], str(self.cycle.id))
