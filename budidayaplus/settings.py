@@ -284,3 +284,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #         "continuous_profiling_auto_start": True,
 #     },
 # )
+
+# Sentry
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://66e47a1eb981fd8f0327ba1bb6f0ee52@o4509330285264897.ingest.us.sentry.io/4509330338807808",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
+
+# SILKY_PYTHON_PROFILER = True
