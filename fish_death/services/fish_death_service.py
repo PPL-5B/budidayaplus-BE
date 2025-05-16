@@ -89,8 +89,7 @@ class FishDeathService:
             new_death_count = existing_fish_death.fish_death_count + payload.fish_death_count
             new_alive_count = max(existing_fish_death.fish_alive_count - payload.fish_death_count, 0)
 
-            if new_death_count > fish_seed:
-                raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({fish_seed} ekor).")
+            if new_death_count > fish_seed: raise HttpError(400, f"Jumlah ikan mati melebihi jumlah ikan bertahan ({fish_seed} ekor).")
 
             FishDeath.objects.filter(id=existing_fish_death.id).update(
                 fish_death_count=new_death_count,
