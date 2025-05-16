@@ -35,7 +35,6 @@ def create_forum(request, data: ForumCreateSchema):
     )
     return new_forum
 
-
 @router.post("/create_reply", response=ForumReplySchema, auth=JWTAuth())
 def create_reply(request, data: ForumCreateSchema):
     if not data.parent_id:
@@ -47,7 +46,7 @@ def create_reply(request, data: ForumCreateSchema):
 
     reply = ForumRepository.create_forum(
         user=request.user,
-        title=data.title,             
+        title=data.title,               # boleh None
         description=data.description,
         tag=data.tag,
         parent=parent_forum
@@ -100,13 +99,11 @@ def forum_overview(request, limit: int = Query(20, ge=1, le=100), offset: int = 
 
     result = []
     for forum in forums:
-        upvotes = vote_summaries[forum.id]["upvotes"] 
-
         result.append({
             "id": forum.id,
             "user": {
                 "id": forum.user.id,
-                "username": forum.user.username,
+                "username": forum.user.username, 
                 "first_name": forum.user.first_name,
                 "last_name": forum.user.last_name,
             },
@@ -116,12 +113,11 @@ def forum_overview(request, limit: int = Query(20, ge=1, le=100), offset: int = 
             "timestamp": forum.timestamp,
             "parent_id": forum.parent.id if forum.parent else None,
             "replies": [],
-            "upvotes": upvotes,
+            "upvotes": vote_summaries.get(forum.id, {}).get("upvotes", 0),
             "user_vote": "up" if forum.id in user_votes else None,
         })
 
     return result
-
 
 from silk.profiling.profiler import silk_profile
 @silk_profile(name="Profiling Search Forum")
@@ -152,13 +148,7 @@ def get_latest_forum(request):
     forum = ForumRepository.get_latest_forum()
     if not forum:
         return Response({"error": "No forums available."}, status=404)
-
-    forum.user = None
-    return {
-        "id": forum.id,
-        "username": forum.user.username
-    }
-
+    return forum
 
 @router.get("/get_replies/{forum_id}", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_replies(request, forum_id: UUID):
@@ -232,5 +222,4 @@ def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
         
     except Http404: return Response({"error": "Forum not found."}, status=404)
     except Exception as e: return Response({"error": str(e)}, status=500)
-
 
