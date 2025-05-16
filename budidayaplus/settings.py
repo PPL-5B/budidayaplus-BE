@@ -265,11 +265,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Sentry
 import sentry_sdk
 
 sentry_sdk.init(
-    dsn="https://72d0c6a3b65589784965fc4a1e3dfcc9@o4509308336406528.ingest.us.sentry.io/4509308353183744",
+    dsn="https://66e47a1eb981fd8f0327ba1bb6f0ee52@o4509330285264897.ingest.us.sentry.io/4509330338807808",
     # Add data like request headers and IP for users,
     # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
     send_default_pii=True,
 )
+
+# SILKY_PYTHON_PROFILER = True
