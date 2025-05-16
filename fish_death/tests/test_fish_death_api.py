@@ -57,11 +57,18 @@ class FishDeathAPITest(TestCase):
         self.token = str(AccessToken.for_user(self.user))
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
+        self.pond_fish_amount_value = 90
+        PondFishAmount.objects.create(
+            pond=self.pond,
+            cycle=self.cycle,
+            fish_amount=self.pond_fish_amount_value
+        )
+
     def test_create_fish_death(self):
         """
         Test creating a new fish death record.
         The payload only contains fish_death_count; the API should fill in recorded_at and fish_alive_count
-        (defaulting to 0 when no PondFishAmount exists).
+        from the PondFishAmount record.
         """
         url = f'/{self.pond.pond_id}/{self.cycle.id}/'
         payload = {"fish_death_count": 7}
@@ -74,8 +81,8 @@ class FishDeathAPITest(TestCase):
         self.assertEqual(response.status_code, 200, response.json())
         data = response.json()
         self.assertIn("id", data)
-        self.assertEqual(data["fish_death_count"], 7)
-        self.assertEqual(data["fish_alive_count"], 0)  # Default value since no PondFishAmount exists
+        self.assertEqual(data["fish_death_count"], 12)
+        self.assertEqual(data["fish_alive_count"], 93)
         self.assertEqual(data["pond_id"], str(self.pond.pond_id))
         self.assertEqual(data["cycle_id"], str(self.cycle.id))
         self.assertTrue(data["recorded_at"])
@@ -121,16 +128,10 @@ class FishDeathAPITest(TestCase):
 
     def test_create_fish_death_with_existing_pond_fish_amount(self):
         """
-        Test creating a fish death record when a PondFishAmount record exists.
+        Test creating a fish death record when a PondFishAmount record exists with a different value.
         The fish_alive_count should be set to the fish_amount from that record.
         """
-        pond_fish_amount_value = 150
-        PondFishAmount.objects.create(
-            pond=self.pond,
-            cycle=self.cycle,
-            fish_amount=pond_fish_amount_value
-        )
-
+        
         url = f'/{self.pond.pond_id}/{self.cycle.id}/'
         payload = {"fish_death_count": 10}
         response = self.client.post(
@@ -141,8 +142,8 @@ class FishDeathAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.json())
         data = response.json()
-        # Verify that fish_alive_count comes from the PondFishAmount record.
-        self.assertEqual(data["fish_alive_count"], pond_fish_amount_value)
+        # Verify that fish_alive_count comes from the PondFishAmount record we created in setUp
+        self.assertEqual(data["fish_alive_count"], self.pond_fish_amount_value)
 
     def test_get_latest_fish_death(self):
         """

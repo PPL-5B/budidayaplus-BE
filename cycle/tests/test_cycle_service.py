@@ -123,26 +123,46 @@ class CycleServiceTest(TestCase):
         self.assertEqual(str(context.exception), "Siklus tidak ditemukan")
         mock_get.assert_called_with(self.supervisor)
 
-    @patch('cycle.services.cycle_service.CycleService.get_stopped_cycle')
-    def test_get_stopped_cycle(self, mock_get_stopped_cycle):
-        mock_cycle = MagicMock(spec=Cycle)
-        mock_get_stopped_cycle.return_value = [mock_cycle]
+    @patch('cycle.services.cycle_service.get_supervisor')
+    def test_get_stopped_cycle_with_results(self, mock_get_supervisor):
+        mock_get_supervisor.return_value = self.user
+        
+        stopped_cycle = Cycle.objects.create(
+            start_date=date.today() - timedelta(days=30),
+            end_date=date.today(),
+            supervisor=self.user,
+            is_stopped=True
+        )
 
-        cycles = CycleService.get_stopped_cycle(self.supervisor)
+        other_cycle = Cycle.objects.create(
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=60),
+            supervisor=self.user,
+            is_stopped=False
+        )
 
-        self.assertEqual(mock_get_stopped_cycle.call_count, 1)
-        self.assertEqual(cycles, [mock_cycle])
-        mock_get_stopped_cycle.assert_called_with(self.supervisor)
+        cycles = CycleService.get_stopped_cycle(self.user)
 
-    @patch('cycle.services.cycle_service.CycleService.get_stopped_cycle')
-    def test_get_stopped_cycle_empty(self, mock_get_stopped_cycle):
-        mock_get_stopped_cycle.return_value = []
+        self.assertEqual(len(cycles), 1)
+        self.assertIn(stopped_cycle, cycles)
+        self.assertNotIn(other_cycle, cycles)
+        mock_get_supervisor.assert_called_once_with(self.user)
 
-        cycles = CycleService.get_stopped_cycle(self.supervisor)
+    @patch('cycle.services.cycle_service.get_supervisor')
+    def test_get_stopped_cycle_no_results(self, mock_get_supervisor):
+        mock_get_supervisor.return_value = self.user
+        
+        Cycle.objects.create(
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=60),
+            supervisor=self.user,
+            is_stopped=False
+        )
 
-        self.assertEqual(mock_get_stopped_cycle.call_count, 1)
-        self.assertEqual(cycles, [])
-        mock_get_stopped_cycle.assert_called_with(self.supervisor)
+        cycles = CycleService.get_stopped_cycle(self.user)
+        
+        self.assertEqual(len(cycles), 0)
+        mock_get_supervisor.assert_called_once_with(self.user)
 
     def test_stop_cycle(self):
         mock_cycle = MagicMock(spec=Cycle)
@@ -165,24 +185,3 @@ class CycleServiceTest(TestCase):
         self.assertEqual(self.mock_get_cycle_by_id.call_count, 1)
         self.assertEqual(self.mock_stop_cycle.call_count, 0)
         self.assertEqual(str(context.exception), "Siklus tidak ditemukan")
-
-    def test_get_stopped_cycle(self):
-        stopped_cycle = Cycle.objects.create(
-            start_date=date.today() - timedelta(days=30),
-            end_date=date.today(),
-            supervisor=self.user,
-            is_stopped=True
-        )
-
-        other_cycle = Cycle.objects.create(
-            start_date=date.today(),
-            end_date=date.today() + timedelta(days=60),
-            supervisor=self.user,
-            is_stopped=False
-        )
-
-        cycles = CycleService.get_stopped_cycle(self.user)
-
-        self.assertEqual(len(cycles), 1)
-        self.assertIn(stopped_cycle, cycles)
-        self.assertNotIn(other_cycle, cycles)
