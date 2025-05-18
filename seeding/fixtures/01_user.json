@@ -1,16 +1,20 @@
 [
-    {
-      "model": "auth.user",
-      "pk": 1,
-      "fields": {
-        "username": "081234567890",
-        "first_name": "Tsabit",
-        "last_name": "Rafi",
-        "is_staff": true,
-        "is_superuser": true,
-        "is_active": true,
-        "password": "teststaging123"
-      }
+  {
+    "model": "auth.user",
+    "pk": 1,
+    "fields": {
+      "username": "081234567890",
+      "first_name": "Tsabit",
+      "last_name": "Coda",
+      "password": "teststaging123"
     }
-  ]
-  
+  },
+  {
+    "model": "user_profile.userprofile",
+    "pk": "00000000-0000-0000-0000-000000000001",
+    "fields": {
+      "user": 1,
+      "image_name": ""
+    }
+  }
+]
