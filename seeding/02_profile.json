@@ -1,0 +1,12 @@
+[
+    {
+      "model": "user_profile.profile",
+      "pk": "00000000-0000-0000-0000-000000000001",
+      "fields": {
+        "user": 1,
+        "image_name": "",
+        "role": "supervisor"
+      }
+    }
+  ]
+  
