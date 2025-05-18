@@ -43,11 +43,9 @@ jobs:
 
             # Hapus seluruh isi database
             docker-compose exec web python manage.py flush --noinput
-
             # Load data dari seeding/fixtures dan tasks/fixtures
             docker-compose exec web python manage.py loaddata \
               seeding/fixtures/01_user.json \
-              seeding/fixtures/02_profile.json \
               seeding/fixtures/03_pond.json \
               seeding/fixtures/04_cycle.json \
               seeding/fixtures/05_pondfishamount.json \
