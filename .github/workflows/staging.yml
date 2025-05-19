@@ -43,16 +43,38 @@ jobs:
 
             # Hapus seluruh isi database
             docker-compose exec -T web python manage.py flush --noinput
-            # Load data dari seeding/fixtures dan tasks/fixtures
-            docker-compose exec -T web python manage.py loaddata \
-              seeding/fixtures/01_user.json \
-              seeding/fixtures/03_pond.json \
-              seeding/fixtures/04_cycle.json \
-              seeding/fixtures/05_pondfishamount.json \
-              seeding/fixtures/06_pondquality.json \
-              seeding/fixtures/07_fishdeath.json \
-              seeding/fixtures/08_fishsampling.json \
-              seeding/fixtures/09_foodsampling.json \
-              seeding/fixtures/10_forum.json \
-              tasks/fixtures/data.json
+            
+            echo "Loading 01_user.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/01_user.json --verbosity 2
+
+            echo "Loading 02_profile.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/02_profile.json --verbosity 2
+
+            echo "Loading 03_pond.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/03_pond.json --verbosity 2
+
+            echo "Loading 04_cycle.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/04_cycle.json --verbosity 2
+
+            echo "Loading 05_pondfishamount.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/05_pondfishamount.json --verbosity 2
+
+            echo "Loading 06_pondquality.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/06_pondquality.json --verbosity 2
+
+            echo "Loading 07_fishdeath.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/07_fishdeath.json --verbosity 2
+
+            echo "Loading 08_fishsampling.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/08_fishsampling.json --verbosity 2
+
+            echo "Loading 09_foodsampling.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/09_foodsampling.json --verbosity 2
+
+            echo "Loading 10_forum.json..."
+            docker-compose exec -T web python manage.py loaddata seeding/fixtures/10_forum.json --verbosity 2
+
+            echo "Loading tasks/fixtures/data.json..."
+            docker-compose exec -T web python manage.py loaddata tasks/fixtures/data.json --verbosity 2
+          EOF
           EOF
