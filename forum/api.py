@@ -100,13 +100,11 @@ def forum_overview(request, limit: int = Query(20, ge=1, le=100), offset: int = 
 
     result = []
     for forum in forums:
-        upvotes = vote_summaries[forum.id]["upvotes"] 
-
         result.append({
             "id": forum.id,
             "user": {
                 "id": forum.user.id,
-                "username": forum.user.username,
+                "username": forum.user.username, 
                 "first_name": forum.user.first_name,
                 "last_name": forum.user.last_name,
             },
@@ -116,7 +114,7 @@ def forum_overview(request, limit: int = Query(20, ge=1, le=100), offset: int = 
             "timestamp": forum.timestamp,
             "parent_id": forum.parent.id if forum.parent else None,
             "replies": [],
-            "upvotes": upvotes,
+            "upvotes": vote_summaries.get(forum.id, {}).get("upvotes", 0),
             "user_vote": "up" if forum.id in user_votes else None,
         })
 
