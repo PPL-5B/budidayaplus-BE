@@ -1,40 +1,66 @@
-- name: Deploy to VM via SSH
-  run: |
-    ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << 'EOF'
-      set -e
-      cd /home/andromeda/dkn/budidayaplus-staging
+name: CI/CD Pipeline to Deploy on Staging
 
-      echo "[INFO] Backing up current state..."
-      PREV_COMMIT=\$(git rev-parse HEAD)
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    branches:
+      - staging
+    types:
+      - closed
 
-      echo "[INFO] Pulling latest code..."
-      if git pull origin staging; then
-        echo "[INFO] Pull successful, restarting docker..."
-        docker-compose down
+jobs:
+  deploy:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
 
-        echo "[INFO] Recreating .env file..."
-        rm -f .env
-        touch .env
-        echo DEBUG=1 >> .env
-        echo DB_HOST=${{ secrets.DB_HOST }} >> .env
-        echo DB_NAME=${{ secrets.DB_NAME }} >> .env
-        echo DB_USER=${{ secrets.DB_USER }} >> .env
-        echo DB_PASS=${{ secrets.DB_PASS }} >> .env
-        echo DB_PORT=${{ secrets.DB_PORT }} >> .env
-        echo PORT=8000 >> .env
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-        echo "[INFO] Starting new container build..."
-        if docker-compose up --build -d; then
-          echo "[INFO] App started. Loading fixtures..."
-          sleep 10
-          bash scripts/load_fixtures.sh
-        else
-          echo "[ERROR] Docker build failed. Rolling back..."
-          git reset --hard \$PREV_COMMIT
-          docker-compose down
-          docker-compose up -d
-        fi
-      else
-        echo "[ERROR] Git pull failed. No changes deployed."
-      fi
-    EOF
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to VM via SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << 'EOF'
+            set -e
+            cd /home/andromeda/dkn/budidayaplus-staging
+
+            echo "[INFO] Backing up current state..."
+            PREV_COMMIT=\$(git rev-parse HEAD)
+
+            echo "[INFO] Pulling latest code..."
+            if git pull origin staging; then
+              echo "[INFO] Pull successful, restarting docker..."
+              docker-compose down
+
+              echo "[INFO] Recreating .env file..."
+              rm -f .env
+              touch .env
+              echo DEBUG=1 >> .env
+              echo DB_HOST=${{ secrets.DB_HOST }} >> .env
+              echo DB_NAME=${{ secrets.DB_NAME }} >> .env
+              echo DB_USER=${{ secrets.DB_USER }} >> .env
+              echo DB_PASS=${{ secrets.DB_PASS }} >> .env
+              echo DB_PORT=${{ secrets.DB_PORT }} >> .env
+              echo PORT=8000 >> .env
+
+              echo "[INFO] Starting new container build..."
+              if docker-compose up --build -d; then
+                echo "[INFO] App started. Loading fixtures..."
+                sleep 10
+                bash scripts/load_fixtures.sh
+              else
+                echo "[ERROR] Docker build failed. Rolling back..."
+                git reset --hard \$PREV_COMMIT
+                docker-compose down
+                docker-compose up -d
+              fi
+            else
+              echo "[ERROR] Git pull failed. No changes deployed."
+            fi
+          EOF
