@@ -58,7 +58,7 @@ def create_reply(request, data: ForumCreateSchema):
 @router.delete("/delete/{forum_id}", auth=JWTAuth())
 def delete_forum(request, forum_id: UUID):
     try:
-        forum = ForumRepository.get_forum_by_id(forum_id)
+        forum = ForumRepository.get_forum_by_id(forum_di)
     except Http404:
         return Response({"error": "Not Found."}, status=404)
 
