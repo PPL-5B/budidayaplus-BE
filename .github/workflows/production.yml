@@ -16,10 +16,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Deploy to VM via SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << 'EOF'
@@ -36,4 +38,20 @@ jobs:
             echo DB_PORT=${{ secrets.DB_PORT }} >> .env
             echo PORT=8001 >> .env
             docker-compose up --build -d
+
+            sleep 10
+
+            docker-compose exec web python manage.py flush --noinput
+
+            docker-compose exec web python manage.py loaddata \
+              seeding/fixtures2/01_user.json \
+              seeding/fixtures2/03_pond.json \
+              seeding/fixtures2/04_cycle.json \
+              seeding/fixtures2/05_pondfishamount.json \
+              seeding/fixtures2/06_pondquality.json \
+              seeding/fixtures2/07_fishdeath.json \
+              seeding/fixtures2/08_fishsampling.json \
+              seeding/fixtures2/09_foodsampling.json \
+              seeding/fixtures2/10_forum.json \
+              tasks/fixtures/data.json || true
           EOF
