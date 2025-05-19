@@ -157,8 +157,6 @@ def get_latest_forum(request):
         "username": forum.user.username
     }
 
-
-
 @router.get("/get_replies/{forum_id}", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_replies(request, forum_id: UUID):
     try:
@@ -231,5 +229,4 @@ def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
         
     except Http404: return Response({"error": "Forum not found."}, status=404)
     except Exception as e: return Response({"error": str(e)}, status=500)
-
 
