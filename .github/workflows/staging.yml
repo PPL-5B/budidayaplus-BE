@@ -54,5 +54,5 @@ jobs:
               seeding/fixtures/08_fishsampling.json \
               seeding/fixtures/09_foodsampling.json \
               seeding/fixtures/10_forum.json \
-              tasks/fixtures/data.json
+              tasks/fixtures/data.json || true
           EOF
