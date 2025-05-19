@@ -15,7 +15,6 @@ class TestAuth(TestCase):
             "password": "AkuAnakEmo"
         }))
 
-
     def test_register(self):
         response = self.client.post(
             "/register",
@@ -32,7 +31,6 @@ class TestAuth(TestCase):
         self.assertIn("access", response.json())
         self.assertIn("refresh", response.json())
 
-
     def test_register_existing(self):
         response = self.client.post("/register", data=json.dumps({
             "phone_number": "08123456789",
@@ -42,7 +40,6 @@ class TestAuth(TestCase):
         }))
 
         self.assertEqual(response.status_code, 400)
-
 
     def test_register_invalid_phone_number(self):
         response = self.client.post("/register", data=json.dumps({
@@ -69,7 +66,6 @@ class TestAuth(TestCase):
         }))
         self.assertEqual(response3.status_code, 400)
 
-
     def test_login(self):
         response = self.client.post("/login", data=json.dumps({
             "phone_number": "08123456789",
@@ -80,7 +76,6 @@ class TestAuth(TestCase):
         self.assertIn("access", response.json())
         self.assertIn("refresh", response.json())
 
-
     def test_login_password_invalid(self):
         response = self.client.post("/login", data=json.dumps({
             "phone_number": "08123456789",
@@ -88,14 +83,12 @@ class TestAuth(TestCase):
         }))
         self.assertEqual(response.status_code, 404)
 
-
     def test_login_user_not_found(self):
         response = self.client.post("/login", data=json.dumps({
             "phone_number": "1234567890",
             "password": "password"
         }))
         self.assertEqual(response.status_code, 404)
-
 
     def test_refresh(self):
         login_res = self.client.post("/login", data=json.dumps({
@@ -111,14 +104,12 @@ class TestAuth(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("access", response.json())
 
-
     def test_refresh_invalid(self):
         response = self.client.post("/refresh", data=json.dumps({
             "refresh": "invalidtoken"
         }))
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "Token invalid atau telah kadaluarsa")
-
 
     def test_refresh_with_deleted_user(self):
         user = User.objects.create_user(username="testuser", password="password123")
@@ -130,7 +121,6 @@ class TestAuth(TestCase):
     
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "Pengguna tidak ditemukan atau token tidak valid")
-
 
     def test_me(self):
         login_res = self.client.post("/login", data=json.dumps({
@@ -146,12 +136,10 @@ class TestAuth(TestCase):
         self.assertEqual(response.json()["first_name"], "Omar")
         self.assertEqual(response.json()["last_name"], "Khalif")
 
-
     def test_me_invalid(self):
         response = self.client.get("/me", headers={"Authorization ": "Bearer invalidtoken"})
         self.assertEqual(response.status_code, 401)
 
-    
     def test_validate_token(self):
         login_res = self.client.post("/login", data=json.dumps({
             "phone_number": "08123456789",
@@ -164,12 +152,10 @@ class TestAuth(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["message"], "Token valid")
 
-
     def test_validate_invalid(self):
         response = self.client.post("/validate", headers={"Authorization": "Bearer invalidtoken"})
         self.assertEqual(response.status_code, 401)
         self.assertNotIn("message", response.json())
-
 
     def test_validate_wrong_method(self):
         response = self.client.get("/validate", headers={"Authorization": "Bearer invalidtoken"})
