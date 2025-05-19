@@ -42,9 +42,9 @@ jobs:
             sleep 10
 
             # Hapus seluruh isi database
-            docker-compose exec web python manage.py flush --noinput
+            docker-compose exec -T web python manage.py flush --noinput
             # Load data dari seeding/fixtures dan tasks/fixtures
-            docker-compose exec web python manage.py loaddata \
+            docker-compose exec -T web python manage.py loaddata \
               seeding/fixtures/01_user.json \
               seeding/fixtures/03_pond.json \
               seeding/fixtures/04_cycle.json \
@@ -54,5 +54,5 @@ jobs:
               seeding/fixtures/08_fishsampling.json \
               seeding/fixtures/09_foodsampling.json \
               seeding/fixtures/10_forum.json \
-              tasks/fixtures/data.json || true
+              tasks/fixtures/data.json
           EOF
