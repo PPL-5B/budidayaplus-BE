@@ -160,6 +160,7 @@ def get_latest_forum(request):
     }
 
 
+
 @router.get("/get_replies/{forum_id}", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_replies(request, forum_id: UUID):
     try:
