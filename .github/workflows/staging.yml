@@ -28,18 +28,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << EOF
             set -e
-
             cd /home/andromeda/dkn/budidayaplus-staging
-
-            # Pastikan backup folder ada
-            mkdir -p ./backups
-
-            TIMESTAMP=\$(date +%F_%H-%M-%S)
-
-            echo "Creating database backup: backups/backup_before_\$TIMESTAMP.sql"
-            docker-compose exec -T db pg_dump -U $DB_USER $DB_NAME -f /backups/backup_before_$TIMESTAMP.sql
-
-
             git pull origin staging
             docker-compose down
 
