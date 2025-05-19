@@ -214,7 +214,6 @@ DATABASES = {
         'PORT': os.environ.get("DB_PORT"),
     }
 }
-
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -286,13 +285,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # )
 
 # Sentry
+# Sentry
 import sentry_sdk
 
 sentry_sdk.init(
-    dsn="https://66e47a1eb981fd8f0327ba1bb6f0ee52@o4509330285264897.ingest.us.sentry.io/4509330338807808",
+    dsn="https://d53d83da381b3e92d55a2f9399859789@o4509004052627456.ingest.de.sentry.io/4509004056428624",
     # Add data like request headers and IP for users,
     # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
     send_default_pii=True,
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for tracing.
+    traces_sample_rate=1.0,
+    _experiments={
+        # Set continuous_profiling_auto_start to True
+        # to automatically start the profiler on when
+        # possible.
+        "continuous_profiling_auto_start": True,
+    },
 )
 
-# SILKY_PYTHON_PROFILER = True
+SILKY_PYTHON_PROFILER = True
