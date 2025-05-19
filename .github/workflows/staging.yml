@@ -26,12 +26,12 @@ jobs:
 
       - name: Deploy to VM via SSH
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << EOF
             set -e
             cd /home/andromeda/dkn/budidayaplus-staging
 
             echo "[INFO] Backing up current state..."
-            PREV_COMMIT=\$(git rev-parse HEAD)
+            PREV_COMMIT=$(git rev-parse HEAD)
 
             echo "[INFO] Pulling latest code..."
             if git pull origin staging; then
