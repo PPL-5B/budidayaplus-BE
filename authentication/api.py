@@ -1,91 +1,36 @@
 from authentication.schemas import LoginSchema, RegisterSchema, RefreshSchema
+from authentication.services.auth_service import AuthenticationService
 from ninja import Router
 from ninja.throttling import AnonRateThrottle
-from ninja_jwt.tokens import RefreshToken
-from ninja_jwt.exceptions import TokenError
-from ninja.errors import HttpError
-from django.contrib.auth.models import User
 from ninja_jwt.authentication import JWTAuth
 from silk.profiling.profiler import silk_profile
 
 router = Router()
 
-
 @router.post("/login", throttle=AnonRateThrottle(rate="10/h"))
-@silk_profile(name="Profiling Login API") 
+@silk_profile(name="Profiling Login API")
 def login(request, data: LoginSchema):
-    try:
-        print("Login attempt with data:", data.dict())
-        user = User.objects.get(username=data.phone_number)
-        if not user.check_password(data.password):
-            raise HttpError(404, "Pengguna tidak terdaftar atau kata sandi salah")
-
-        refresh = RefreshToken.for_user(user)
-        new_access_token = str(refresh.access_token)
-
-        print('access token:' + new_access_token)
-
-        response = {
-            "message": "Login berhasil",
-            "access": new_access_token,
-            "refresh": str(refresh),
-        }
-
-        return response
-    
-    except User.DoesNotExist:
-        raise HttpError(404, "Pengguna tidak terdaftar atau kata sandi salah")
-
+    response = AuthenticationService.login(data.phone_number, data.password)
+    return response
 
 @router.post("/register")
 def register(request, data: RegisterSchema):
-    try:
-        if User.objects.filter(username=data.phone_number).exists():
-            raise HttpError(400, "Pengguna sudah terdaftar")
-
-        user = User.objects.create_user(
-            username=data.phone_number,
-            password=data.password,
-            first_name=data.first_name,
-            last_name=data.last_name,
-            is_staff=True
-        )
-        refresh = RefreshToken.for_user(user)
-        return {
-            "message": "Akun berhasil dibuat",
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }
-    except Exception as e:
-        raise HttpError(400, str(e))
-
+    response = AuthenticationService.register(
+        data.phone_number, data.first_name, data.last_name, data.password
+    )
+    return response
 
 @router.post("/refresh")
 def refresh(request, data: RefreshSchema):
-    try:
-        refresh = RefreshToken(data.refresh)
-        new_access_token = str(refresh.access_token)
-
-        user_id = refresh.payload.get("user_id")
-        if not User.objects.filter(id=user_id).exists():
-            raise HttpError(401, "Pengguna tidak ditemukan atau token tidak valid")
-
-        return {"access": new_access_token}
-    except TokenError:
-        raise HttpError(401, "Token invalid atau telah kadaluarsa")
-
+    response = AuthenticationService.refresh_token(data.refresh)
+    return response
 
 @router.post("/validate", auth=JWTAuth())
 def validate(request):
-    return {"message": "Token valid"}
-
+    response = AuthenticationService.validate_token(request.auth)
+    return response
 
 @router.get("/me", auth=JWTAuth())
 def get_user_by_token(request):
-    user = request.auth
-    return {
-        "id": user.id,
-        "phone_number": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name
-    }
+    response = AuthenticationService.get_user_details(request.auth)
+    return response
