@@ -25,6 +25,7 @@ jobs:
       - name: Deploy to VM via SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USERNAME }}@${{ secrets.VM_IP }} << 'EOF'
+            set -e
             cd /home/andromeda/dkn/budidayaplus-production
             git pull origin main
             docker-compose down
@@ -41,17 +42,5 @@ jobs:
 
             sleep 10
 
-            docker-compose exec web python manage.py flush --noinput
-
-            docker-compose exec web python manage.py loaddata \
-              seeding/fixtures2/01_user.json \
-              seeding/fixtures2/03_pond.json \
-              seeding/fixtures2/04_cycle.json \
-              seeding/fixtures2/05_pondfishamount.json \
-              seeding/fixtures2/06_pondquality.json \
-              seeding/fixtures2/07_fishdeath.json \
-              seeding/fixtures2/08_fishsampling.json \
-              seeding/fixtures2/09_foodsampling.json \
-              seeding/fixtures2/10_forum.json \
-              tasks/fixtures/data.json || true
+            bash scripts/load_fixtures2.sh
           EOF
