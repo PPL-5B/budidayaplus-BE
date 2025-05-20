@@ -1,25 +1,20 @@
 from locust import HttpUser, TaskSet, task, between
-import json
-from datetime import datetime
-import os
+import random
 
-# Authentication API Tasks
 class AuthenticationTasks(TaskSet):
     def on_start(self):
         """Executed when a simulated user starts."""
-        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
-        self.phone_number = "08123456789"
-        self.password = pwd
-        self.first_name = "Omar"
-        self.last_name = "Khalif"
+        self.phone_number = "08" + str(random.randint(100000000, 999999999))
+        self.password = "lelealomani"
+        self.first_name = "alomani"
+        self.last_name = "lele"
         self.access_token = None
         self.refresh_token = None
 
-        # Register a user
+        print(f"Trying to register: {self.phone_number}")
         self.register_user()
 
     def register_user(self):
-        """Simulate user registration."""
         payload = {
             "phone_number": self.phone_number,
             "first_name": self.first_name,
@@ -32,18 +27,33 @@ class AuthenticationTasks(TaskSet):
                 tokens = response.json()
                 self.access_token = tokens.get("access")
                 self.refresh_token = tokens.get("refresh")
+                print(f"Register success: {self.phone_number}")
+                self.registered = True
+            else:
+                print(f"Register failed ({response.status_code}): {response.text}")
+                self.registered = False
         except Exception as e:
             print(f"Register error: {e}")
+            self.registered = False
+
 
     @task
     def login(self):
         """Simulate user login."""
+        if not getattr(self, 'registered', False):
+            print(f"Skipping login because register failed for {self.phone_number}")
+            return
+    
         payload = {
             "phone_number": self.phone_number,
             "password": self.password
         }
         try:
-            self.client.post("/api/auth/login", json=payload)
+            response = self.client.post("/api/auth/login", json=payload)
+            if response.status_code == 200:
+                print(f"Login success: {self.phone_number}")
+            else:
+                print(f"Login failed ({response.status_code}): {response.text}")
         except Exception as e:
             print(f"Login error: {e}")
 
@@ -75,95 +85,7 @@ class AuthenticationTasks(TaskSet):
             except Exception as e:
                 print(f"Get user info error: {e}")
 
-
-# Food Sampling API Tasks
-class FoodSamplingTasks(TaskSet):
-    def on_start(self):
-        """Executed when a simulated user starts."""
-        self.cycle_id = "test-cycle-id"
-        self.pond_id = "test-pond-id"
-        self.sampling_id = "test-sampling-id"
-        self.access_token = self.login()
-
-    def login(self):
-        """Simulate user login to get an access token."""
-        pwd = os.getenv("TEST_USER_PASSWORD", "defaultpass123")
-        try:
-            response = self.client.post(
-                "/api/auth/login",
-                json={"phone_number": "08123456789", "password": pwd}
-            )
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("access")
-            else:
-                print(f"Login failed with status: {response.status_code}")
-        except Exception as e:
-            print(f"Login error in FoodSamplingTasks: {e}")
-        return None
-
-    @task
-    def get_food_sampling(self):
-        """Simulate fetching a specific food sampling."""
-        if self.access_token:
-            try:
-                self.client.get(
-                    f"/api/food-sampling/{self.cycle_id}/{self.pond_id}/{self.sampling_id}/",
-                    headers={"Authorization": f"Bearer {self.access_token}"}
-                )
-            except Exception as e:
-                print(f"Get food sampling error: {e}")
-
-    @task
-    def list_food_samplings(self):
-        """Simulate listing all food samplings for a pond."""
-        if self.access_token:
-            try:
-                self.client.get(
-                    f"/api/food-sampling/{self.pond_id}/",
-                    headers={"Authorization": f"Bearer {self.access_token}"}
-                )
-            except Exception as e:
-                print(f"List food samplings error: {e}")
-
-    @task
-    def get_latest_food_sampling(self):
-        """Simulate fetching the latest food sampling for a pond and cycle."""
-        if self.access_token:
-            try:
-                self.client.get(
-                    f"/api/food-sampling/{self.cycle_id}/{self.pond_id}/latest/",
-                    headers={"Authorization": f"Bearer {self.access_token}"}
-                )
-            except Exception as e:
-                print(f"Get latest food sampling error: {e}")
-
-    @task
-    def create_food_sampling(self):
-        """Simulate creating a new food sampling."""
-        if self.access_token:
-            payload = {
-                "food_quantity": 30,
-                "recorded_at": datetime.now().isoformat()
-            }
-            try:
-                self.client.post(
-                    f"/api/food-sampling/{self.cycle_id}/{self.pond_id}/",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {self.access_token}"}
-                )
-            except Exception as e:
-                print(f"Create food sampling error: {e}")
-
-
-# Locust User Classes
 class AuthenticationUser(HttpUser):
     tasks = [AuthenticationTasks]
     wait_time = between(1, 3)
-    host = "http://localhost:8000/"  # Base host URL
-
-
-class FoodSamplingUser(HttpUser):
-    tasks = [FoodSamplingTasks]
-    wait_time = between(1, 3)
-    host = "http://localhost:8000/"  # Base host URL
+    host = "http://127.0.0.1:8000"
