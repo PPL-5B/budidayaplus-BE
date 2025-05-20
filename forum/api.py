@@ -35,7 +35,6 @@ def create_forum(request, data: ForumCreateSchema):
     )
     return new_forum
 
-
 @router.post("/create_reply", response=ForumReplySchema, auth=JWTAuth())
 def create_reply(request, data: ForumCreateSchema):
     if not data.parent_id:
@@ -47,7 +46,7 @@ def create_reply(request, data: ForumCreateSchema):
 
     reply = ForumRepository.create_forum(
         user=request.user,
-        title=data.title,             
+        title=data.title,               # boleh None
         description=data.description,
         tag=data.tag,
         parent=parent_forum
@@ -58,7 +57,7 @@ def create_reply(request, data: ForumCreateSchema):
 @router.delete("/delete/{forum_id}", auth=JWTAuth())
 def delete_forum(request, forum_id: UUID):
     try:
-        forum = ForumRepository.get_forum_by_id(forum_di)
+        forum = ForumRepository.get_forum_by_id(forum_id)
     except Http404:
         return Response({"error": "Not Found."}, status=404)
 
@@ -120,7 +119,6 @@ def forum_overview(request, limit: int = Query(20, ge=1, le=100), offset: int = 
 
     return result
 
-
 from silk.profiling.profiler import silk_profile
 @silk_profile(name="Profiling Search Forum")
 @router.get("/search", response=List[ForumOutputSchema], auth=JWTAuth())
@@ -150,12 +148,7 @@ def get_latest_forum(request):
     forum = ForumRepository.get_latest_forum()
     if not forum:
         return Response({"error": "No forums available."}, status=404)
-
-    forum.user = None
-    return {
-        "id": forum.id,
-        "username": forum.user.username
-    }
+    return forum
 
 @router.get("/get_replies/{forum_id}", response=List[ForumOutputSchema], auth=JWTAuth())
 def get_replies(request, forum_id: UUID):
@@ -229,4 +222,3 @@ def update_forum(request, forum_id: UUID, data: ForumUpdateSchema):
         
     except Http404: return Response({"error": "Forum not found."}, status=404)
     except Exception as e: return Response({"error": str(e)}, status=500)
-
