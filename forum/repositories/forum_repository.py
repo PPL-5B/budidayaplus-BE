@@ -80,7 +80,11 @@ class ForumRepository:
     
     @staticmethod
     def upvote_forum(user: User, forum: Forum):
-        ForumVote.objects.get_or_create(user=user, forum=forum)
+        ForumVote.objects.update_or_create(
+            user=user,
+            forum=forum,
+            defaults={'vote_choice': 'up'}
+        )
 
     @staticmethod
     def cancel_vote(user: User, forum: Forum):
