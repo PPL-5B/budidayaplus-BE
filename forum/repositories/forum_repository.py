@@ -83,7 +83,6 @@ class ForumRepository:
         ForumVote.objects.update_or_create(
             user=user,
             forum=forum,
-            defaults={'vote_choice': 'up'}
         )
 
     @staticmethod
