@@ -53,6 +53,7 @@ jobs:
               if docker-compose up --build -d; then
                 echo "[INFO] App started. Loading fixtures..."
                 sleep 10
+                bash scripts/load_fixtures.sh
               else
                 echo "[ERROR] Docker build failed. Rolling back..."
                 git reset --hard \$PREV_COMMIT
