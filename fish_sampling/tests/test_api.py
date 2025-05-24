@@ -159,22 +159,17 @@ class FishSamplingAPITest(TestCase):
 
         self.assertEqual(response.status_code, 200, "Status response seharusnya 200")
 
-        # Ambil daftar fish samplings dari response API
         fish_samplings = response.json().get('fish_samplings', [])
 
-        # Cek apakah jumlah fish samplings lebih dari 0
         self.assertGreaterEqual(len(fish_samplings), 1, "Fish sampling data kurang dari 1")
 
-        # Cek data fish sampling pertama
         self.assertEqual(fish_samplings[0]['sampling_id'], str(self.fish_sampling.sampling_id))
         self.assertEqual(fish_samplings[0]['pond_id'], str(self.fish_sampling.pond.pond_id))
 
-        # Cek data fish sampling kedua hanya jika ada cukup data
         if len(fish_samplings) > 1:
             self.assertEqual(fish_samplings[1]['sampling_id'], str(self.fish_sampling_userA.sampling_id))
             self.assertEqual(fish_samplings[1]['pond_id'], str(self.fish_sampling_userA.pond.pond_id))
         
-        # Cek apakah cycle_id sesuai
         self.assertEqual(response.json()['cycle_id'], str(self.cycle.id))
 
     def test_list_fish_samplings_by_pond_invalid_cycle(self):
@@ -193,7 +188,6 @@ class FishSamplingAPITest(TestCase):
         self.assertEqual(response.json()['detail'], "Data belum tersedia, silakan isi data terlebih dahulu")
     
     def test_get_fish_status_valid(self):
-        """Menguji apakah status ikan dihitung dengan benar jika ada data fish sampling"""
         response = self.client.get(
             f'/{self.pond.pond_id}/{self.cycle.id}/status/',
             headers=self.headers
@@ -206,23 +200,19 @@ class FishSamplingAPITest(TestCase):
 
 class DetermineFishStatusTest(TestCase):
     def test_determine_fish_status_normal(self):
-        """Pastikan ikan dikategorikan normal jika berada dalam margin 20% dari target"""
-        self.assertEqual(determine_fish_status(1, 5.5, 0.002), "normal")  # Sesuai target
-        self.assertEqual(determine_fish_status(1, 6.0, 0.0021), "normal")  # Sedikit di atas
-        self.assertEqual(determine_fish_status(1, 5.0, 0.0019), "normal")  # Sedikit di bawah
+        self.assertEqual(determine_fish_status(1, 5.5, 0.002), "normal")  
+        self.assertEqual(determine_fish_status(1, 6.0, 0.0021), "normal") 
+        self.assertEqual(determine_fish_status(1, 5.0, 0.0019), "normal")  
 
     def test_determine_fish_status_abnormal_due_to_length(self):
-        """Pastikan ikan dikategorikan abnormal jika panjang melebihi 20% target"""
-        self.assertEqual(determine_fish_status(1, 7.0, 0.002), "abnormal")  # 27% lebih panjang
-        self.assertEqual(determine_fish_status(1, 4.0, 0.002), "abnormal")  # 27% lebih pendek
+        self.assertEqual(determine_fish_status(1, 7.0, 0.002), "abnormal")  
+        self.assertEqual(determine_fish_status(1, 4.0, 0.002), "abnormal")  
 
     def test_determine_fish_status_abnormal_due_to_weight(self):
-        """Pastikan ikan dikategorikan abnormal jika berat melebihi 20% target"""
-        self.assertEqual(determine_fish_status(1, 5.5, 0.003), "abnormal")  # Berat lebih dari 20% target
-        self.assertEqual(determine_fish_status(1, 5.5, 0.001), "abnormal")  # Berat kurang dari 20% target
+        self.assertEqual(determine_fish_status(1, 5.5, 0.003), "abnormal")  
+        self.assertEqual(determine_fish_status(1, 5.5, 0.001), "abnormal")  
 
     def test_determine_fish_status_invalid_week(self):
-        """Pastikan jika week di luar 1-9, return invalid_week"""
         self.assertEqual(determine_fish_status(0, 5.5, 0.002), "invalid_week")
         self.assertEqual(determine_fish_status(10, 5.5, 0.002), "invalid_week")
         
