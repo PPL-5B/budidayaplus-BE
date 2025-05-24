@@ -15,4 +15,3 @@ class PondFishAmount(models.Model):
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='pond_fish_amount')
     pond = models.ForeignKey(Pond, on_delete=models.CASCADE)
     fish_amount = models.IntegerField()
-
