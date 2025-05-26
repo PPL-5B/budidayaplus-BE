@@ -1,0 +1,24 @@
+[
+    {
+      "model": "pond_quality.pondquality",
+      "pk": "44444444-4444-4444-4444-444444444444",
+      "fields": {
+        "cycle": "22222222-2222-2222-2222-222222222222",
+        "pond": "11111111-1111-1111-1111-111111111111",
+        "reporter": 1,
+        "recorded_at": "2025-05-10T08:00:00Z",
+        "image_name": "",
+        "ph_level": 7.0,
+        "salinity": 2.0,
+        "water_temperature": 28.0,
+        "water_clarity": 70.0,
+        "water_circulation": 1.0,
+        "dissolved_oxygen": 6.0,
+        "orp": 300,
+        "ammonia": 1.0,
+        "nitrate": 10.0,
+        "phosphate": 1.0
+      }
+    }
+  ]
+  

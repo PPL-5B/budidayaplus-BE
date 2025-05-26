@@ -138,3 +138,12 @@ GitHub.sublime-settings
 
 # Mac problem
 .DS_Store
+
+# Django staticfiles - ignore all static assets
+/staticfiles/
+staticfiles/
+
+# Additional specific static directories to ensure they're ignored
+staticfiles/admin/
+staticfiles/rest_framework/
+staticfiles/silk/

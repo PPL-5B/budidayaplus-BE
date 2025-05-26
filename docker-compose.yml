@@ -2,10 +2,18 @@ version: '3.8'
 services:
   web:
     build: .
-    command: gunicorn --workers 3 --bind 0.0.0.0:8000 budidayaplus.wsgi:application
+    command: sh -c "gunicorn --workers 3 --bind 0.0.0.0:${PORT} budidayaplus.wsgi:application"
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "${PORT}:${PORT}"
+    
+    env_file:
+      - .env
     environment:
       - DEBUG=1
+      # - DB_HOST=db
+      # - DB_NAME=postgres
+      # - DB_USER=postgres
+      # - DB_PASS=postgres
+      # - DB_PORT=5432

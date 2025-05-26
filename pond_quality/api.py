@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from django.shortcuts import get_object_or_404
 from ninja import Router
 from ninja_jwt.authentication import JWTAuth
@@ -6,11 +7,16 @@ from cycle.models import Cycle
 from cycle.services.cycle_service import CycleService
 from pond.models import Pond
 from pond_quality.models import PondQuality
-from pond_quality.schemas import PondQualityInput, PondQualityOutput, PondQualityHistory
+from pond_quality.schemas import PondQualityAlert, PondQualityInput, PondQualityOutput, PondQualityHistory, PondQualitySummary
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.core.exceptions import ObjectDoesNotExist
 from user_profile.utils import get_supervisor
+from threshold.utils import validate_pond_quality_against_threshold
+from silk.profiling.profiler import silk_profile
+from pond_quality.services import get_pond_qualities_for_response, fetch_latest_pond_quality
+
+
 
 DATA_NOT_FOUND = "Data tidak ditemukan"
 CYCLE_NOT_ACTIVE = "Siklus tidak aktif"
@@ -23,6 +29,7 @@ def check_cycle_active(cycle):
     if not (cycle.start_date <= today <= cycle.end_date):
         raise HttpError(400, CYCLE_NOT_ACTIVE)
 
+@silk_profile(name="List Pond Quality")
 @router.get("/{pond_id}/", auth=JWTAuth(), response={200: PondQualityHistory})
 def list_pond_quality(request, pond_id: str):
     cycle = CycleService.get_active_cycle(request.auth)
@@ -30,14 +37,15 @@ def list_pond_quality(request, pond_id: str):
 
     check_cycle_active(cycle)
 
-    pond_quality = PondQuality.objects.filter(cycle=cycle, pond=pond)
+    pond_qualities = get_pond_qualities_for_response(cycle, pond)
+
 
     return {
-        "pond_qualities": pond_quality,
+        "pond_qualities": pond_qualities,
         "cycle_id": cycle.id
     }
 
-
+@silk_profile(name="Add Pond Quality")
 @router.post("/{cycle_id}/{pond_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityInput):
     supervisor = get_supervisor(user=request.auth)
@@ -61,6 +69,7 @@ def add_pond_quality(request, cycle_id: str, pond_id: str, payload: PondQualityI
     return pond_quality
 
 
+@silk_profile(name="Get Pond Quality Data")
 @router.get("/{cycle_id}/{pond_id}/{pond_quality_id}/", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str):
     cycle = Cycle.objects.get(id=cycle_id)
@@ -82,20 +91,78 @@ def get_pond_quality(request, cycle_id: str, pond_id: str, pond_quality_id: str)
     return pond_quality
 
 
+@silk_profile(name="Get Latest Pond Quality")
 @router.get("/{cycle_id}/{pond_id}/latest", auth=JWTAuth(), response={200: PondQualityOutput})
 def get_latest_pond_quality(request, cycle_id: str, pond_id: str):
-    cycle = Cycle.objects.get(id=cycle_id)
+    cycle = get_object_or_404(Cycle, id=cycle_id)
     pond = get_object_or_404(Pond, pond_id=pond_id)
     supervisor = get_supervisor(user=request.auth)
+
+    # 🔹 Pindahkan validasi user sebelum mencoba mengambil data
+    if pond.owner != supervisor:
+        raise HttpError(401, UNAUTHORIZED_ACCESS)
 
     check_cycle_active(cycle)
 
     try:
-        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).select_related('reporter').latest('recorded_at')
+        pond_quality = fetch_latest_pond_quality(cycle, pond)
     except ObjectDoesNotExist:
         raise HttpError(404, DATA_NOT_FOUND)
 
-    if (pond.owner != supervisor):
-        raise HttpError(401, UNAUTHORIZED_ACCESS)
-
     return pond_quality
+
+@silk_profile(name="Fetch Dashboard Table Data")
+def fetch_dashboard_table_data(cycle, pond):
+    #Helper function untuk mengambil data dashboar
+    try:
+        pond_quality = PondQuality.objects.filter(pond=pond, cycle=cycle).latest('recorded_at')
+    except ObjectDoesNotExist:
+        raise HttpError(404, DATA_NOT_FOUND)
+
+    return {
+        "recorded_at": pond_quality.recorded_at,
+        "ph_level": pond_quality.ph_level,
+        "salinity": pond_quality.salinity,
+        "water_temperature": pond_quality.water_temperature,
+        "water_clarity": pond_quality.water_clarity
+    }
+
+@router.get("/{cycle_id}/{pond_id}/dashboard-table", auth=JWTAuth())
+def get_dashboard_table_data(request, cycle_id: str, pond_id: str):
+    cycle = Cycle.objects.get(id=cycle_id)
+    pond = get_object_or_404(Pond, pond_id=pond_id)
+    
+    check_cycle_active(cycle)
+
+    return fetch_dashboard_table_data(cycle, pond)
+
+@silk_profile(name="Pond Quality Alerts")
+@router.get("/{pond_id}/alerts", auth=JWTAuth(), response={200: List[PondQualityAlert]})
+def get_pond_quality_alerts(request, pond_id: str):
+    user = request.auth
+    cycle = Cycle.objects.get(user=user, active=True)  # Ambil siklus aktif berdasarkan pengguna
+
+    # Pastikan siklus aktif untuk pengguna
+    check_cycle_active(cycle)
+
+    # Ambil data dashboard (4 parameter)
+    dashboard_data = get_dashboard_table_data(request, cycle.id, pond_id)
+
+    # Validasi data terhadap threshold
+    _status, violations, _states = validate_pond_quality_against_threshold(dashboard_data)
+    # Jika ada violations, buatkan alert untuk setiap pelanggaran
+    alerts = [
+        PondQualityAlert(
+            parameter=violation["parameter"],
+            actual_value=violation["actual_value"],
+            target_value=violation["target_value"],
+            status=violation["status"]
+        ) for violation in violations
+    ]
+
+    return alerts
+
+def authorize_user(self, user, pond: Pond):
+    supervisor = get_supervisor(user)
+    if pond.owner != supervisor:
+        raise HttpError(401, self.UNAUTHORIZED_ACCESS)

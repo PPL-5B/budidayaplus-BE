@@ -1,0 +1,15 @@
+[
+    {
+      "model": "pond.pond",
+      "pk": "11111111-1111-1111-1111-111111111111",
+      "fields": {
+        "owner": 1,
+        "name": "Kolam Lele Vundu",
+        "image_name": "",
+        "length": 5.0,
+        "width": 3.0,
+        "depth": 2.0
+      }
+    }
+  ]
+  

@@ -1,0 +1,15 @@
+[
+    {
+      "model": "forum.forum",
+      "pk": "88888888-8888-8888-8888-888888888888",
+      "fields": {
+        "user": 1,
+        "description": "Bagaimana cara mengatasi air keruh di kolam?",
+        "tag": "Kolam",
+        "timestamp": "2025-05-16T09:00:00Z",
+        "title": "Air Kolam Keruh",
+        "parent_id": null
+      }
+    }
+  ]
+  

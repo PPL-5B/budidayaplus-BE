@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from ninja.errors import HttpError
 from cycle.repositories.cycle_repo import CycleRepo
 from food_sampling.repositories.food_sampling_repository import FoodSamplingRepository
@@ -13,6 +13,8 @@ class FoodSamplingService:
     DATA_NOT_FOUND = "Data tidak ditemukan"
     INVALID_FOOD_QUANTITY = "Input kuantitas makanan tidak valid"
     UNAUTHORIZED_ACCESS = "Anda tidak memiliki akses untuk melihat data ini"
+
+    food_sampling_target = {i: {'food_quantity': i} for i in range(1, 31)}
 
     def __init__(self, repository: FoodSamplingRepository):
         self.repository = repository
@@ -38,6 +40,10 @@ class FoodSamplingService:
             raise HttpError(404, self.DATA_NOT_FOUND)
 
         self.authorize_user(user, pond)
+
+        target_food_quantity = self.food_sampling_target.get(1, {}).get('food_quantity', 0)
+        food_sampling.target_food_quantity = target_food_quantity
+
         return food_sampling
 
     def get_latest_food_sampling(self, cycle_id: str, pond_id: str, user) -> FoodSampling:
@@ -50,12 +56,22 @@ class FoodSamplingService:
         if food_sampling is None:
             raise HttpError(404, self.DATA_NOT_FOUND)
 
-        self.authorize_user(user, pond)
-        return food_sampling
+        try:
+            self.authorize_user(user, pond)
+        except:
+            raise HttpError(401, self.UNAUTHORIZED_ACCESS)
 
+        target_food_quantity = self.food_sampling_target.get(1, {}).get('food_quantity', 0)
+        food_sampling.target_food_quantity = target_food_quantity
+
+        return food_sampling
+    
     def list_food_samplings(self, pond_id: str, user):
         cycle = CycleRepo.get_active_cycle(get_supervisor(user))
-        pond = self.repository.get_pond(pond_id)
+        try:
+            pond = self.repository.get_pond(pond_id)
+        except:
+            raise HttpError(404, self.DATA_NOT_FOUND)
 
         if self.authorize_user(user, pond):
             raise HttpError(401, self.UNAUTHORIZED_ACCESS)
@@ -63,6 +79,11 @@ class FoodSamplingService:
             raise HttpError(404, CYCLE_NOT_ACTIVE)
 
         food_samplings = self.repository.list_food_samplings(cycle, pond)
+
+        for index, food_sampling in enumerate(food_samplings, 1):
+            target_food_quantity = self.food_sampling_target.get(index, self.food_sampling_target.get(1, {})).get('food_quantity', 0)
+            food_sampling.target_food_quantity = target_food_quantity
+
         return {
             'food_samplings': food_samplings,
             'cycle_id': cycle.id
@@ -90,4 +111,7 @@ class FoodSamplingService:
         except ValueError:
             raise HttpError(400, self.INVALID_FOOD_QUANTITY)
 
+        target_food_quantity = self.food_sampling_target.get(1, {}).get('food_quantity', 0)
+        food_sampling.target_food_quantity = target_food_quantity
+        
         return food_sampling

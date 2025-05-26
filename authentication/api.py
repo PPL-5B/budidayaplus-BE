@@ -6,24 +6,33 @@ from ninja_jwt.exceptions import TokenError
 from ninja.errors import HttpError
 from django.contrib.auth.models import User
 from ninja_jwt.authentication import JWTAuth
+from silk.profiling.profiler import silk_profile
 
 router = Router()
 
 
 @router.post("/login", throttle=AnonRateThrottle(rate="10/h"))
+@silk_profile(name="Profiling Login API") 
 def login(request, data: LoginSchema):
     try:
+        print("Login attempt with data:", data.dict())
         user = User.objects.get(username=data.phone_number)
         if not user.check_password(data.password):
             raise HttpError(404, "Pengguna tidak terdaftar atau kata sandi salah")
 
         refresh = RefreshToken.for_user(user)
-        return {
+        new_access_token = str(refresh.access_token)
+
+        print('access token:' + new_access_token)
+
+        response = {
             "message": "Login berhasil",
-            "access": str(refresh.access_token),
+            "access": new_access_token,
             "refresh": str(refresh),
         }
 
+        return response
+    
     except User.DoesNotExist:
         raise HttpError(404, "Pengguna tidak terdaftar atau kata sandi salah")
 

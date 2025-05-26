@@ -1,0 +1,13 @@
+[
+    {
+      "model": "cycle.cycle",
+      "pk": "22222222-2222-2222-2222-222222222222",
+      "fields": {
+        "start_date": "2025-05-01",
+        "end_date": "2025-06-30",
+        "supervisor": 1,
+        "is_stopped": false
+      }
+    }
+  ]
+  

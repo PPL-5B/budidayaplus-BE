@@ -9,3 +9,6 @@ python-dotenv
 Django
 django-cors-headers
 django-stubs
+sentry-sdk[django]
+django-silk
+argon2-cffi
